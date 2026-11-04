@@ -1,1 +1,19 @@
+# Entornos virtuales
 venv/
+env/
+ENV/
+.venv/
+.env
+
+# Archivos compilados y cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Cache de pruebas y herramientas
+.pytest_cache/
+.coverage
+
+# Archivos del editor / IDE
+.vscode/
+.idea/
