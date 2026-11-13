@@ -17,3 +17,5 @@ __pycache__/
 # Archivos del editor / IDE
 .vscode/
 .idea/
+# Base de datos local
+*.db
