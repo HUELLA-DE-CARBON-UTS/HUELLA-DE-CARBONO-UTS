@@ -6,6 +6,14 @@ from pydantic import BaseModel
 from starlette.routing import Match
 
 from app.services.contratos.resultado import cuerpo_estandar
+"""Estructura estándar de las respuestas JSON (Tabla 22 del Parcial 1)."""
+
+from typing import Any
+
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from app.domain.value_objects.fecha import ahora
 
 
 class ErrorCampo(BaseModel):
@@ -58,3 +66,13 @@ def datos_de_ruta(request: Request) -> dict:
         if coincide == Match.FULL:
             return getattr(endpoint, "openapi_extra", None) or {}
     return {}
+              funcionalidad: str | None = None) -> JSONResponse:
+    cuerpo = {
+        "estado": "exito" if codigo < 400 else "error",
+        "codigo": codigo,
+        "mensaje": mensaje,
+        "datos": datos,
+        "errores": errores or [],
+        "metadatos": {"funcionalidad": funcionalidad, "fecha": ahora().isoformat()},
+    }
+    return JSONResponse(status_code=codigo, content=cuerpo)

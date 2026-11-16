@@ -16,3 +16,6 @@ solicitudes se autentican con `Authorization: Bearer <TOKEN_ADMIN_INICIAL>`.
 Si `SMTP_HOST` está vacío, los correos (credenciales de usuarios nuevos y credenciales
 temporales) se muestran en la consola del servidor. Es solo para desarrollo; en otro
 ambiente se configuran los datos SMTP del `.env`.
+## Pruebas
+
+`python -m pytest -v`

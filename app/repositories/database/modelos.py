@@ -8,6 +8,9 @@ MOD-03 Parametrización: sedes.
 from datetime import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, String, Table, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.repositories.database.conexion import Base
