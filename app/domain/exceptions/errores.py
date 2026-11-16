@@ -1,3 +1,6 @@
+"""Errores de negocio que la API convierte en la respuesta JSON estándar (Tabla 22)."""
+
+
 class ErrorNegocio(Exception):
     codigo = 400
 

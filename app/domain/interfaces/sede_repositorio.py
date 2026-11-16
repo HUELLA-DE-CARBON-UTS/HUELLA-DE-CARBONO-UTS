@@ -1,3 +1,5 @@
+"""Contrato del repositorio de sedes."""
+
 from typing import Protocol
 
 from app.domain.entities.sede import Sede
@@ -9,3 +11,7 @@ class SedeRepositorio(Protocol):
     def siguiente_id(self) -> str: ...
 
     def guardar(self, sede: Sede) -> Sede: ...
+
+    def buscar_por_id(self, id_sede: str) -> Sede | None: ...
+
+    def buscar_por_nombre(self, nombre: str) -> list[Sede]: ...

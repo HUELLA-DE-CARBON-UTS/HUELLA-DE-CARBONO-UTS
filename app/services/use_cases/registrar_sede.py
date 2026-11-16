@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+"""Caso de uso FUN-16 / PRO-16: registrar una nueva sede."""
+
+>>>>>>> feature/HU-01-registro-usuario
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.domain.entities.sede import Sede
@@ -37,6 +42,10 @@ class RegistrarSede:
             )
             return self.repositorio.guardar(sede)
         except IntegrityError as exc:
+<<<<<<< HEAD
+=======
+            # Otra solicitud registró la misma sede entre la verificación y el guardado.
+>>>>>>> feature/HU-01-registro-usuario
             raise _sede_duplicada(datos["nombre"], datos["ciudad"]) from exc
         except SQLAlchemyError as exc:
             raise ServicioNoDisponible(

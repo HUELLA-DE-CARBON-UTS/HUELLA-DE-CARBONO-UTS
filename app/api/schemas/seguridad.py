@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 """Esquemas de entrada y salida del módulo MOD-02 Gestión de Seguridad."""
 
+=======
+>>>>>>> feature/HU-01-registro-usuario
 from pydantic import BaseModel, Field
 
 

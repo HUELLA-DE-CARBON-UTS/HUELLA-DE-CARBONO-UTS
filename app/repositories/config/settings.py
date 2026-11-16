@@ -21,5 +21,16 @@ class Settings:
     token_admin_inicial: str = os.getenv("TOKEN_ADMIN_INICIAL", "")
     documento_admin_inicial: str = os.getenv("DOCUMENTO_ADMIN_INICIAL", "1000000000")
 
+<<<<<<< HEAD
+=======
+    # Servicio de correo (API-EXT-04). Si SMTP_HOST está vacío, los correos se
+    # escriben en la consola del servidor (solo para desarrollo).
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_usuario: str = os.getenv("SMTP_USUARIO", "")
+    smtp_contrasena: str = os.getenv("SMTP_CONTRASENA", "")
+    correo_remitente: str = os.getenv("CORREO_REMITENTE", "no-responder@huella-carbono.local")
+
+>>>>>>> feature/HU-01-registro-usuario
 
 settings = Settings()

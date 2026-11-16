@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+"""Implementación del repositorio de sedes con SQLAlchemy."""
+
+>>>>>>> feature/HU-01-registro-usuario
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -28,6 +33,17 @@ class SedeRepositorioSQLAlchemy:
         )
         return self.sesion.scalar(consulta) is not None
 
+<<<<<<< HEAD
+=======
+    def buscar_por_id(self, id_sede: str) -> Sede | None:
+        modelo = self.sesion.get(SedeModelo, id_sede)
+        return _a_entidad(modelo) if modelo else None
+
+    def buscar_por_nombre(self, nombre: str) -> list[Sede]:
+        consulta = select(SedeModelo).where(func.lower(SedeModelo.nombre) == nombre.lower())
+        return [_a_entidad(m) for m in self.sesion.scalars(consulta)]
+
+>>>>>>> feature/HU-01-registro-usuario
     def siguiente_id(self) -> str:
         ids = self.sesion.scalars(select(SedeModelo.id_sede)).all()
         mayor = max((int(i.split("-")[1]) for i in ids), default=0)

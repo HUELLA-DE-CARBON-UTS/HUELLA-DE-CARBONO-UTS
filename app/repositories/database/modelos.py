@@ -1,6 +1,19 @@
+<<<<<<< HEAD
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, Table, UniqueConstraint
+=======
+"""Tablas de la base de datos.
+
+MOD-01 Gestión de Usuarios: usuarios.
+MOD-02 Gestión de Seguridad: operaciones, roles y credenciales.
+MOD-03 Parametrización: sedes.
+"""
+
+from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, UniqueConstraint
+>>>>>>> feature/HU-01-registro-usuario
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.repositories.database.conexion import Base
@@ -44,3 +57,38 @@ class SedeModelo(Base):
     responsable: Mapped[str] = mapped_column(String(100))
     estado: Mapped[str] = mapped_column(String(10), default="activa")
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+<<<<<<< HEAD
+=======
+
+
+class UsuarioModelo(Base):
+    __tablename__ = "usuarios"
+
+    id_usuario: Mapped[str] = mapped_column(String(10), primary_key=True)
+    documento: Mapped[str] = mapped_column(String(15), unique=True, index=True)
+    nombres: Mapped[str] = mapped_column(String(120))
+    correo: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    telefono: Mapped[str] = mapped_column(String(15), default="")
+    # El administrador inicial no tiene sede; los demás usuarios siempre la tienen.
+    id_sede: Mapped[str | None] = mapped_column(String(10), ForeignKey("sedes.id_sede"), nullable=True)
+    estado: Mapped[str] = mapped_column(String(10), default="activo")
+    fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    responsable: Mapped[str] = mapped_column(String(20))
+
+    sede: Mapped[SedeModelo | None] = relationship(lazy="joined")
+
+
+class CredencialModelo(Base):
+    """Credencial de acceso y rol asignado de cada usuario (datos de MOD-02)."""
+
+    __tablename__ = "credenciales"
+
+    documento: Mapped[str] = mapped_column(String(15), ForeignKey("usuarios.documento"), primary_key=True)
+    hash_contrasena: Mapped[str] = mapped_column(String(200))
+    temporal: Mapped[bool] = mapped_column(Boolean, default=True)
+    usada: Mapped[bool] = mapped_column(Boolean, default=False)
+    id_rol: Mapped[str] = mapped_column(String(10), ForeignKey("roles.id_rol"))
+    fecha_actualizacion: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    rol: Mapped[RolModelo] = relationship(lazy="joined")
+>>>>>>> feature/HU-01-registro-usuario
