@@ -1,5 +1,3 @@
-"""Entidad Usuario del módulo MOD-01 Gestión de Usuarios."""
-
 from dataclasses import dataclass
 from datetime import datetime
 

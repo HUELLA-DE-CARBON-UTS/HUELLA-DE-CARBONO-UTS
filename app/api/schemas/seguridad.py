@@ -1,5 +1,3 @@
-"""Esquemas de entrada y salida del módulo MOD-02 Gestión de Seguridad."""
-
 from pydantic import BaseModel, Field
 
 

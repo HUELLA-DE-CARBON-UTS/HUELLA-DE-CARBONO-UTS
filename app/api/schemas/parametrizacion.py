@@ -1,5 +1,3 @@
-"""Esquemas de entrada y salida del módulo MOD-03 Parametrización."""
-
 from pydantic import BaseModel, Field
 
 

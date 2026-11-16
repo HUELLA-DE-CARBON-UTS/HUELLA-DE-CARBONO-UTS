@@ -1,5 +1,3 @@
-"""Rutas del módulo MOD-02 Gestión de Seguridad (RolController)."""
-
 from fastapi import APIRouter, Body, Depends, Path
 from sqlalchemy.orm import Session
 

@@ -1,5 +1,3 @@
-"""Entidad Sede del módulo MOD-03 Parametrización."""
-
 from dataclasses import dataclass
 from datetime import datetime
 

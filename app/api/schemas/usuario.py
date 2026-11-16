@@ -1,9 +1,3 @@
-"""Esquemas de entrada del módulo MOD-01 Gestión de Usuarios.
-
-Los campos llegan como texto opcional: que estén completos y con formato válido lo
-valida cada caso de uso, para responder con el mensaje de cada campo que pide la historia.
-"""
-
 from pydantic import BaseModel, Field
 
 

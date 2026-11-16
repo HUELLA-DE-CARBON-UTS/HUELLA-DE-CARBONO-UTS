@@ -1,5 +1,3 @@
-"""Estructura estándar de las respuestas JSON (Tabla 22 del Parcial 1)."""
-
 from typing import Any
 
 from fastapi import Request

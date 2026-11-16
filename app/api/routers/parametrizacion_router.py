@@ -1,5 +1,3 @@
-"""Rutas del módulo MOD-03 Parametrización (SedeController)."""
-
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 

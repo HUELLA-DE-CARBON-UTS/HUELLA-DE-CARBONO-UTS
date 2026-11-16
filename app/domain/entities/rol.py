@@ -1,5 +1,3 @@
-"""Entidad Rol del módulo MOD-02 Gestión de Seguridad."""
-
 from dataclasses import dataclass, field
 
 
