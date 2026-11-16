@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.middleware.manejo_errores import registrar_manejadores
-from app.api.routers import seguridad_router
+from app.api.routers import parametrizacion_router, seguridad_router
 from app.repositories.config.settings import settings
 from app.repositories.database.conexion import SessionLocal, engine
 from app.repositories.database.inicializacion import inicializar_base_de_datos
@@ -24,6 +24,7 @@ app = FastAPI(
 )
 registrar_manejadores(app)
 app.include_router(seguridad_router.router)
+app.include_router(parametrizacion_router.router)
 
 
 @app.get("/", tags=["Estado"])
