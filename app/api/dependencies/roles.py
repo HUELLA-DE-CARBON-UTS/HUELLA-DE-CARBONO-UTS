@@ -1,3 +1,4 @@
+
 """Dependencia que aplica IC-01 verificarPermiso a un endpoint."""
 
 from fastapi import Depends

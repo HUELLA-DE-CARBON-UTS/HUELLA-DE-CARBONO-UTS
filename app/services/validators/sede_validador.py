@@ -1,7 +1,10 @@
+"""Validaciones de PRO-16: campos obligatorios completos y dentro de su longitud."""
+
 from app.domain.exceptions.errores import DatosNoValidos
 
 MENSAJE = "Los datos de la sede no son válidos"
 
+# campo: (mensaje si está vacío, longitud máxima)
 CAMPOS = {
     "nombre": ("El nombre de la sede es obligatorio", 80),
     "ciudad": ("La ciudad es obligatoria", 60),
@@ -11,6 +14,7 @@ CAMPOS = {
 
 
 def limpiar(valor: str | None) -> str:
+    """Quita espacios sobrantes al inicio, al final y entre palabras."""
     return " ".join((valor or "").split())
 
 

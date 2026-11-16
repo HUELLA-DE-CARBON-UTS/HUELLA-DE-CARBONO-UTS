@@ -11,6 +11,11 @@ Al iniciar se crean las tablas, el catálogo de operaciones FUN-01 a FUN-65 y el
 "Administrador" (ROL-01). Mientras no exista el inicio de sesión (HU-06), las
 solicitudes se autentican con `Authorization: Bearer <TOKEN_ADMIN_INICIAL>`.
 
+## Correo (API-EXT-04)
+
+Si `SMTP_HOST` está vacío, los correos (credenciales de usuarios nuevos y credenciales
+temporales) se muestran en la consola del servidor. Es solo para desarrollo; en otro
+ambiente se configuran los datos SMTP del `.env`.
 ## Pruebas
 
 `python -m pytest -v`

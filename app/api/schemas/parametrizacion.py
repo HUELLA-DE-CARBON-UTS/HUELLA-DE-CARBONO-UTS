@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field
 
 
 class SedeEntrada(BaseModel):
+    # Los campos llegan como texto; que estén completos lo valida el caso de uso
+    # para responder con el mensaje de cada campo (por ejemplo "La dirección es obligatoria").
     nombre: str = Field("", description="Nombre de la sede")
     ciudad: str = Field("", description="Ciudad donde funciona la sede")
     direccion: str = Field("", description="Dirección de la sede")

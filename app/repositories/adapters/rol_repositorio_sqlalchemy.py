@@ -26,6 +26,10 @@ class RolRepositorioSQLAlchemy:
         modelo = self.sesion.scalar(select(RolModelo).where(RolModelo.nombre == nombre))
         return _a_entidad(modelo) if modelo else None
 
+    def buscar_por_id(self, id_rol: str) -> Rol | None:
+        modelo = self.sesion.get(RolModelo, id_rol)
+        return _a_entidad(modelo) if modelo else None
+
     def operaciones_existentes(self, codigos: list[str]) -> set[str]:
         consulta = select(OperacionModelo.codigo).where(OperacionModelo.codigo.in_(codigos))
         return set(self.sesion.scalars(consulta))

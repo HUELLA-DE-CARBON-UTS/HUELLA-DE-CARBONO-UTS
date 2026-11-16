@@ -20,3 +20,4 @@ def obtener_sesion(
             {"campo": "sesion", "detalle": "Debe iniciar sesión para realizar esta operación"},
         ])
     return SesionUsuario(documento=settings.documento_admin_inicial, rol="Administrador")
+    return SesionUsuario(documento=settings.documento_admin_inicial, rol="Administrador")
