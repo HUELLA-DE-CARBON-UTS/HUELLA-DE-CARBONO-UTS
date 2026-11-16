@@ -1,5 +1,3 @@
-"""Convierte los errores en la respuesta JSON estándar."""
-
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,8 +13,10 @@ TRADUCCIONES = {
     "json_invalid": "El cuerpo de la solicitud no es un JSON válido",
 }
 
-# Funcionalidad asociada a cada ruta, para el campo metadatos.funcionalidad.
-FUNCIONALIDAD_POR_RUTA = {"/api/v1/roles/": "FUN-11"}
+FUNCIONALIDAD_POR_RUTA = {
+    "/api/v1/roles/": "FUN-11",
+    "/api/v1/sedes": "FUN-16",
+}
 
 
 def _funcionalidad(request: Request) -> str | None:

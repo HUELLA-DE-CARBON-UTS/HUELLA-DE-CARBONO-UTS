@@ -1,8 +1,6 @@
-"""Tablas del módulo MOD-02 Gestión de Seguridad (roles y operaciones)."""
-
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Table
+from sqlalchemy import Column, DateTime, ForeignKey, String, Table, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.repositories.database.conexion import Base
@@ -33,3 +31,16 @@ class RolModelo(Base):
     responsable: Mapped[str] = mapped_column(String(20))
 
     operaciones: Mapped[list[OperacionModelo]] = relationship(secondary=rol_operacion, lazy="selectin")
+
+
+class SedeModelo(Base):
+    __tablename__ = "sedes"
+    __table_args__ = (UniqueConstraint("nombre", "ciudad", name="uq_sede_nombre_ciudad"),)
+
+    id_sede: Mapped[str] = mapped_column(String(10), primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(80))
+    ciudad: Mapped[str] = mapped_column(String(60))
+    direccion: Mapped[str] = mapped_column(String(150))
+    responsable: Mapped[str] = mapped_column(String(100))
+    estado: Mapped[str] = mapped_column(String(10), default="activa")
+    fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True))

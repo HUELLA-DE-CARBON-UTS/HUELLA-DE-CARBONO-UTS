@@ -1,6 +1,3 @@
-"""Errores de negocio que la API convierte en la respuesta JSON estándar (Tabla 22)."""
-
-
 class ErrorNegocio(Exception):
     codigo = 400
 
@@ -16,6 +13,10 @@ class SesionNoValida(ErrorNegocio):
 
 class PermisoDenegado(ErrorNegocio):
     codigo = 403
+
+
+class Conflicto(ErrorNegocio):
+    codigo = 409
 
 
 class DatosNoValidos(ErrorNegocio):
