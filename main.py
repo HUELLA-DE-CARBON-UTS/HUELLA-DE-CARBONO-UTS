@@ -33,4 +33,4 @@ app.include_router(parametrizacion_router.router)
 
 @app.get("/", tags=["Estado"])
 def root():
-    return {"mensaje": "API Activa"}
+    return {"message": "API Activa"}

@@ -1,5 +1,3 @@
-"""Rutas del módulo MOD-01 Gestión de Usuarios (UsuarioController)."""
-
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 
@@ -18,21 +16,21 @@ COMUNES = {401: {"description": "No hay una sesión vigente"}}
 @router.post(
     "/usuarios",
     summary="HU-01 Registrar un usuario con su rol y sede inicial",
-    description="Registra al colaborador en estado «activo», crea sus credenciales con el rol inicial (IC-12) "
+    description="Registra al colaborador en estado «active», crea sus credenciales con el rol inicial (IC-12) "
                 "y las envía a su correo (API-EXT-04). La sede se valida con IC-11. Si el correo no sale, el "
-                "usuario queda creado y datos.credencialesEnviadas = false. Requiere el permiso FUN-01 (IC-01).",
+                "usuario queda creado y data.credentialsSent = false. Requiere el permiso FUN-01 (IC-01).",
     response_model=RespuestaEstandar, status_code=201, openapi_extra=ruta("FUN-01", MSG_FUN01),
     responses={
         201: ejemplo(201, "Usuario registrado correctamente", {
-            "idUsuario": "USR-0027", "documento": "1098765432", "nombres": "Laura Patricia Rueda Gómez",
-            "correo": "lrueda@empresa-transportadora.co", "rol": "Coordinador de operaciones",
-            "sede": "Bucaramanga", "estado": "activo", "credencialesEnviadas": True}, None, "FUN-01"),
+            "userId": "USR-0027", "document": "1098765432", "fullName": "Laura Patricia Rueda Gómez",
+            "email": "lrueda@empresa-transportadora.co", "role": "Coordinador de operaciones",
+            "site": "Bucaramanga", "status": "active", "credentialsSent": True}, None, "FUN-01"),
         **COMUNES,
         403: {"description": "El rol de la sesión no tiene el permiso FUN-01"},
         409: ejemplo(409, "Ya existe un usuario con el documento o el correo indicado", None,
-                     [{"campo": "documento", "detalle": "El documento 1098765432 ya está registrado"}], "FUN-01"),
+                     [{"field": "document", "detail": "El documento 1098765432 ya está registrado"}], "FUN-01"),
         422: ejemplo(422, "La sede o el rol indicados no están disponibles", None,
-                     [{"campo": "sede", "detalle": "La sede Cúcuta se encuentra inactiva"}], "FUN-01"),
+                     [{"field": "site", "detail": "La sede Cúcuta se encuentra inactiva"}], "FUN-01"),
         503: {"description": MSG_FUN01},
     },
 )
@@ -43,7 +41,7 @@ def registrar_usuario(
     correo=Depends(get_servicio_correo),
 ):
     datos, enviadas = RegistrarUsuario(db, correo).ejecutar(
-        entrada.documento, entrada.nombres, entrada.correo, entrada.telefono, entrada.rol, entrada.sede,
+        entrada.document, entrada.fullName, entrada.email, entrada.phone, entrada.role, entrada.site,
         sesion.documento)
     mensaje = "Usuario registrado correctamente" if enviadas else \
         "Usuario registrado correctamente, pero no fue posible enviar las credenciales al correo"

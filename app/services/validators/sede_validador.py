@@ -1,10 +1,9 @@
-"""Validaciones de PRO-16: campos obligatorios completos y dentro de su longitud."""
-
 from app.domain.exceptions.errores import DatosNoValidos
 
 MENSAJE = "Los datos de la sede no son válidos"
 
-# campo: (mensaje si está vacío, longitud máxima)
+CAMPOS_API = {"nombre": "name", "ciudad": "city", "direccion": "address", "responsable": "manager"}
+
 CAMPOS = {
     "nombre": ("El nombre de la sede es obligatorio", 80),
     "ciudad": ("La ciudad es obligatoria", 60),
@@ -14,7 +13,6 @@ CAMPOS = {
 
 
 def limpiar(valor: str | None) -> str:
-    """Quita espacios sobrantes al inicio, al final y entre palabras."""
     return " ".join((valor or "").split())
 
 
@@ -23,8 +21,8 @@ def validar_obligatorios(datos: dict[str, str]) -> None:
     for campo, (mensaje_vacio, maximo) in CAMPOS.items():
         valor = datos.get(campo, "")
         if not valor:
-            errores.append({"campo": campo, "detalle": mensaje_vacio})
+            errores.append({"field": CAMPOS_API[campo], "detail": mensaje_vacio})
         elif len(valor) > maximo:
-            errores.append({"campo": campo, "detalle": f"El campo no puede superar {maximo} caracteres"})
+            errores.append({"field": CAMPOS_API[campo], "detail": f"El campo no puede superar {maximo} caracteres"})
     if errores:
         raise DatosNoValidos(MENSAJE, errores)

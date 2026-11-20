@@ -17,6 +17,6 @@ def obtener_sesion(
     esperado = settings.token_admin_inicial
     if not token or not esperado or not secrets.compare_digest(token, esperado):
         raise SesionNoValida("No hay una sesión vigente", [
-            {"campo": "sesion", "detalle": "Debe iniciar sesión para realizar esta operación"},
+            {"field": "session", "detail": "Debe iniciar sesión para realizar esta operación"},
         ])
     return SesionUsuario(documento=settings.documento_admin_inicial, rol="Administrador")

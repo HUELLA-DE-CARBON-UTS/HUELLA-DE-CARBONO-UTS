@@ -1,10 +1,3 @@
-"""IC-01 verificarPermiso: decide si el rol de la sesión puede ejecutar una operación.
-
-Versión inicial: valida contra los permisos guardados del rol. La
-identificación de la sesión se completará con HU-06 (inicio de sesión) y
-HU-07 (autorización de cada operación).
-"""
-
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -25,6 +18,6 @@ def verificar_permiso(db: Session, sesion: SesionUsuario, operacion: str, mensaj
     autorizado = rol is not None and rol.estado == "activo" and any(o.codigo == operacion for o in rol.operaciones)
     if not autorizado:
         raise PermisoDenegado(mensaje, [{
-            "campo": "sesion",
-            "detalle": f"El rol {sesion.rol} no tiene autorizada la operación {operacion}",
+            "field": "session",
+            "detail": f"El rol {sesion.rol} no tiene autorizada la operación {operacion}",
         }])
