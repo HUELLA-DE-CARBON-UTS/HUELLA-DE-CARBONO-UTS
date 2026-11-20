@@ -24,7 +24,7 @@ def registrar_manejadores(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def error_validacion(request: Request, exc: RequestValidationError):
         errores = [
-            {"campo": str(e["loc"][-1]), "detalle": TRADUCCIONES.get(e["type"], e["msg"])}
+            {"field": str(e["loc"][-1]), "detail": TRADUCCIONES.get(e["type"], e["msg"])}
             for e in exc.errors()
         ]
         return responder(422, "Los datos enviados no son válidos", None, errores,
@@ -34,5 +34,5 @@ def registrar_manejadores(app: FastAPI) -> None:
     async def error_base_de_datos(request: Request, exc: SQLAlchemyError):
         datos = _datos_de_ruta(request)
         return responder(503, datos.get("x-mensaje-503", "El servicio no está disponible en este momento"), None,
-                         [{"campo": "baseDeDatos", "detalle": "La base de datos no está disponible"}],
+                         [{"field": "database", "detail": "La base de datos no está disponible"}],
                          datos.get("x-funcionalidad"))
