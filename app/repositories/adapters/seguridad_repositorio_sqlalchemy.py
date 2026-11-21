@@ -1,4 +1,5 @@
 import secrets
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -61,9 +62,24 @@ class SesionRepositorioSQLAlchemy:
         self.sesion.flush()
         return _sesion(modelo), token
 
+    def buscar(self, id_sesion: str) -> Sesion | None:
+        m = self.sesion.get(SesionModelo, id_sesion)
+        return _sesion(m) if m else None
+
     def buscar_por_token(self, token: str) -> Sesion | None:
         m = self.sesion.scalar(select(SesionModelo).where(SesionModelo.token_hash == hash_token(token)))
         return _sesion(m) if m else None
+
+    def registrar_actividad(self, id_sesion: str) -> None:
+        self.sesion.get(SesionModelo, id_sesion).ultima_actividad = ahora()
+        self.sesion.flush()
+
+    def finalizar(self, id_sesion: str) -> datetime:
+        m = self.sesion.get(SesionModelo, id_sesion)
+        m.estado = "finalizada"
+        m.fecha_salida = ahora()
+        self.sesion.flush()
+        return m.fecha_salida
 
 
 class BitacoraRepositorioSQLAlchemy:

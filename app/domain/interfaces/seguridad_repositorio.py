@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Protocol
 
 from app.domain.entities.sesion import Credencial, EventoBitacora, Sesion
@@ -14,7 +15,13 @@ class CredencialRepositorio(Protocol):
 class SesionRepositorio(Protocol):
     def crear(self, documento: str, requiere_cambio: bool) -> tuple[Sesion, str]: ...
 
+    def buscar(self, id_sesion: str) -> Sesion | None: ...
+
     def buscar_por_token(self, token: str) -> Sesion | None: ...
+
+    def registrar_actividad(self, id_sesion: str) -> None: ...
+
+    def finalizar(self, id_sesion: str) -> datetime: ...
 
 
 class BitacoraRepositorio(Protocol):
