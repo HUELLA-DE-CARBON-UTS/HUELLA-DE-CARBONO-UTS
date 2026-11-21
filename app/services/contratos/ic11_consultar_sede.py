@@ -27,6 +27,13 @@ def consultar_sede(db: Session, referencia: str) -> dict:
             "estado": sede.estado}
 
 
+def nombres_de_sedes(db: Session, ids: list[str]) -> dict[str, str]:
+    ids = [i for i in set(ids) if i]
+    if not ids:
+        return {}
+    return {s.id_sede: s.nombre for s in SedeRepositorioSQLAlchemy(db).por_ids(ids)}
+
+
 def error_de_sede(info: dict, referencia: str, campo: str) -> dict | None:
     if not info["existe"]:
         return {"field": campo, "detail": f"La sede {referencia} no existe"}

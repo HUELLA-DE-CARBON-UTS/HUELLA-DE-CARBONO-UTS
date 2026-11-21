@@ -1,5 +1,3 @@
-"""Implementación del repositorio de sedes con SQLAlchemy."""
-
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -37,6 +35,9 @@ class SedeRepositorioSQLAlchemy:
     def buscar_por_nombre(self, nombre: str) -> list[Sede]:
         consulta = select(SedeModelo).where(func.lower(SedeModelo.nombre) == nombre.lower())
         return [_a_entidad(m) for m in self.sesion.scalars(consulta)]
+
+    def por_ids(self, ids: list[str]) -> list[Sede]:
+        return [_a_entidad(m) for m in self.sesion.scalars(select(SedeModelo).where(SedeModelo.id_sede.in_(ids)))]
 
     def siguiente_id(self) -> str:
         ids = self.sesion.scalars(select(SedeModelo.id_sede)).all()

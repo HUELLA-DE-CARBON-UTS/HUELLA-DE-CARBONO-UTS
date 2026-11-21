@@ -17,8 +17,10 @@ class Settings:
     database_url: str = os.getenv("DATABASE_URL") or f"sqlite:///{(RAIZ / 'dev.db').as_posix()}"
     secret_key: str = os.getenv("SECRET_KEY", "")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-    token_admin_inicial: str = os.getenv("TOKEN_ADMIN_INICIAL", "")
+
     documento_admin_inicial: str = os.getenv("DOCUMENTO_ADMIN_INICIAL", "1000000000")
+    correo_admin_inicial: str = os.getenv("CORREO_ADMIN_INICIAL", "admin@huella-carbono.local")
+    contrasena_admin_inicial: str = os.getenv("CONTRASENA_ADMIN_INICIAL", "")
 
     smtp_host: str = os.getenv("SMTP_HOST", "")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))

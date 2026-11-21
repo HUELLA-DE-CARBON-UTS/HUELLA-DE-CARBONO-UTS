@@ -9,3 +9,10 @@ class ConfiguracionRolEntrada(BaseModel):
         "description": "Consulta consumo, emisiones, indicadores y reportes",
         "permissions": ["FUN-41", "FUN-42", "FUN-49", "FUN-50", "FUN-53", "FUN-54", "FUN-56", "FUN-57", "FUN-61"],
     }]}}
+
+
+class IngresoEntrada(BaseModel):
+    username: str = Field("", description="Correo o documento del usuario")
+    password: str = Field("", description="Contraseña")
+
+    model_config = {"json_schema_extra": {"examples": [{"username": "1098765432", "password": "********"}]}}
