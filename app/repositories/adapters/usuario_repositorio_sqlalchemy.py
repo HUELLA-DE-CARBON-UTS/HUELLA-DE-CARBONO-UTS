@@ -1,5 +1,3 @@
-"""Implementación del repositorio de usuarios con SQLAlchemy."""
-
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -14,7 +12,6 @@ def _a_entidad(m: UsuarioModelo) -> Usuario:
 
 
 class UsuarioRepositorioSQLAlchemy:
-    """No confirma la transacción: lo hace el caso de uso cuando termina todos sus pasos."""
 
     def __init__(self, sesion: Session):
         self.sesion = sesion
@@ -42,3 +39,7 @@ class UsuarioRepositorioSQLAlchemy:
             estado=usuario.estado, fecha_creacion=usuario.fecha_creacion or ahora(), responsable=responsable,
         ))
         self.sesion.flush()
+
+    def por_documentos(self, documentos: list[str]) -> list[Usuario]:
+        consulta = select(UsuarioModelo).where(UsuarioModelo.documento.in_(documentos)).order_by(UsuarioModelo.nombres)
+        return [_a_entidad(m) for m in self.sesion.scalars(consulta)]

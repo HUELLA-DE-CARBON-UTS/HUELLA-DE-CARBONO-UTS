@@ -5,13 +5,43 @@ from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.api.schemas.seguridad import ConfiguracionRolEntrada
+from app.api.schemas.seguridad import ConfiguracionRolEntrada, IngresoEntrada
+from app.domain.entities.sesion import Sesion
 from app.repositories.adapters.rol_repositorio_sqlalchemy import RolRepositorioSQLAlchemy
 from app.services.use_cases.configurar_rol import ConfigurarRol
+from app.services.use_cases.iniciar_sesion import IniciarSesion
 from app.services.mappers import api
 
 router = APIRouter(prefix="/api/v1", tags=["MOD-02 Gestión de Seguridad"])
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
+
+
+@router.post(
+    "/auth/sesiones",
+    summary="HU-06 Ingresar al sistema y crear la sesión",
+    description="Valida usuario (correo o documento) y contraseña, verifica que el usuario esté activo (IC-14) y "
+                "crea la sesión. El token para las demás solicitudes llega en la cabecera **X-Token-Sesion** y se "
+                "envía como `Authorization: Bearer <token>`. Si la credencial es temporal, "
+                "passwordChangeRequired = true y la sesión no puede ejecutar operaciones. Cada ingreso e intento "
+                "fallido queda en la bitácora.",
+    response_model=RespuestaEstandar, status_code=201, openapi_extra=ruta("FUN-06", "No fue posible iniciar la sesión"),
+    responses={
+        201: {**ejemplo(201, "Ingreso exitoso", {
+            "sessionId": "SES-8F21A7", "user": "1098765432", "role": "Coordinador de operaciones",
+            "site": "Bucaramanga", "passwordChangeRequired": False}, None, "FUN-06"),
+            "headers": {"X-Token-Sesion": {"description": "Token de la sesión", "schema": {"type": "string"}}}},
+        401: ejemplo(401, "Usuario o contraseña incorrectos", None,
+                     [{"field": "credentials", "detail": "Las credenciales no coinciden"}], "FUN-06"),
+        403: ejemplo(403, "El usuario no puede ingresar al sistema", None,
+                     [{"field": "username", "detail": "El usuario se encuentra inactivo"}], "FUN-06"),
+        422: {"description": "Usuario o contraseña vacíos"},
+        503: {"description": "No fue posible iniciar la sesión"},
+    },
+)
+def iniciar_sesion(entrada: IngresoEntrada | None = Body(None), db: Session = Depends(get_db)):
+    entrada = entrada or IngresoEntrada()
+    datos, token = IniciarSesion(db).ejecutar(entrada.username, entrada.password)
+    return responder(201, "Ingreso exitoso", datos, funcionalidad="FUN-06", headers={"X-Token-Sesion": token})
 
 
 @router.put(

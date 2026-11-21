@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.repositories.database.conexion import Base
@@ -74,3 +74,27 @@ class CredencialModelo(Base):
     fecha_actualizacion: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     rol: Mapped[RolModelo] = relationship(lazy="joined")
+
+
+class SesionModelo(Base):
+    __tablename__ = "sesiones"
+
+    id_sesion: Mapped[str] = mapped_column(String(10), primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    documento: Mapped[str] = mapped_column(String(15), index=True)
+    estado: Mapped[str] = mapped_column(String(12), default="vigente")
+    requiere_cambio_contrasena: Mapped[bool] = mapped_column(Boolean, default=False)
+    fecha_ingreso: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ultima_actividad: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fecha_salida: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EventoBitacoraModelo(Base):
+    __tablename__ = "bitacora_accesos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    usuario: Mapped[str] = mapped_column(String(120), index=True)
+    tipo_evento: Mapped[str] = mapped_column(String(30), index=True)
+    operacion: Mapped[str] = mapped_column(String(10))
+    id_sesion: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
