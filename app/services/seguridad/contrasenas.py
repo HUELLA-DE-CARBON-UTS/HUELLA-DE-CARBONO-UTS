@@ -39,3 +39,10 @@ def generar_token() -> str:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def enmascarar_correo(correo: str) -> str:
+    usuario, _, dominio = correo.partition("@")
+    if len(usuario) <= 2:
+        return f"{usuario[:1]}***@{dominio}"
+    return f"{usuario[0]}***{usuario[-1]}@{dominio}"

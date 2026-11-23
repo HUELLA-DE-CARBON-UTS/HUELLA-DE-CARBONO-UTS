@@ -98,3 +98,17 @@ class EventoBitacoraModelo(Base):
     operacion: Mapped[str] = mapped_column(String(10))
     id_sesion: Mapped[str | None] = mapped_column(String(10), nullable=True)
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class HistorialCambioModelo(Base):
+    __tablename__ = "historial_cambios"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    entidad: Mapped[str] = mapped_column(String(20))
+    id_entidad: Mapped[str] = mapped_column(String(20), index=True)
+    tipo_cambio: Mapped[str] = mapped_column(String(40))
+    valor_anterior: Mapped[str] = mapped_column(String(400), default="")
+    valor_nuevo: Mapped[str] = mapped_column(String(400), default="")
+    motivo: Mapped[str] = mapped_column(String(300), default="")
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    responsable: Mapped[str] = mapped_column(String(20))

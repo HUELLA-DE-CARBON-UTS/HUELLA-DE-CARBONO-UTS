@@ -29,6 +29,14 @@ class CredencialRepositorioSQLAlchemy:
                                          usada=False, id_rol=id_rol, fecha_actualizacion=ahora()))
         self.sesion.flush()
 
+    def reemplazar_contrasena(self, documento: str, hash_contrasena: str, temporal: bool) -> None:
+        m = self._modelo(documento)
+        m.hash_contrasena = hash_contrasena
+        m.temporal = temporal
+        m.usada = False
+        m.fecha_actualizacion = ahora()
+        self.sesion.flush()
+
     def marcar_usada(self, documento: str) -> None:
         m = self._modelo(documento)
         m.usada = True
@@ -80,6 +88,10 @@ class SesionRepositorioSQLAlchemy:
         m.fecha_salida = ahora()
         self.sesion.flush()
         return m.fecha_salida
+
+    def vigentes_de(self, documento: str) -> list[Sesion]:
+        consulta = select(SesionModelo).where(SesionModelo.documento == documento, SesionModelo.estado == "vigente")
+        return [_sesion(m) for m in self.sesion.scalars(consulta)]
 
 
 class BitacoraRepositorioSQLAlchemy:

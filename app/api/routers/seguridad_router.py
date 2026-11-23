@@ -2,15 +2,17 @@ from fastapi import APIRouter, Body, Depends, Path
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario, sesion_del_token
+from app.api.dependencies.correo import get_servicio_correo
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.api.schemas.seguridad import ConfiguracionRolEntrada, IngresoEntrada
+from app.api.schemas.seguridad import ConfiguracionRolEntrada, IngresoEntrada, RestablecimientoEntrada
 from app.domain.entities.sesion import Sesion
 from app.repositories.adapters.rol_repositorio_sqlalchemy import RolRepositorioSQLAlchemy
 from app.services.use_cases.cerrar_sesion import CerrarSesion
 from app.services.use_cases.configurar_rol import ConfigurarRol
 from app.services.use_cases.iniciar_sesion import IniciarSesion
+from app.services.use_cases.restablecer_contrasena import RestablecerContrasena
 from app.services.mappers import api
 
 router = APIRouter(prefix="/api/v1", tags=["MOD-02 Gestión de Seguridad"])
@@ -70,6 +72,39 @@ def cerrar_sesion(
 ):
     datos = CerrarSesion(db).ejecutar(sessionId, sesion)
     return responder(200, "Sesión finalizada correctamente", datos, funcionalidad="FUN-08")
+
+
+@router.post(
+    "/auth/restablecimientos",
+    summary="HU-09 Restablecer la contraseña con una credencial temporal",
+    description="Genera una credencial temporal de un solo uso que reemplaza la anterior, cierra las sesiones "
+                "abiertas del usuario (IC-13) y la envía a su correo (API-EXT-04). La respuesta nunca incluye la "
+                "credencial. Requiere el permiso FUN-09 (IC-01).",
+    response_model=RespuestaEstandar, status_code=201,
+    openapi_extra=ruta("FUN-09", "No fue posible restablecer la contraseña"),
+    responses={
+        201: ejemplo(201, "Contraseña restablecida. La credencial temporal fue enviada al correo registrado", {
+            "document": "91234567", "destinationEmail": "j***n@empresa-transportadora.co", "closedSessions": 2,
+            "temporaryCredentialSent": True}, None, "FUN-09"),
+        **SIN_SESION,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-09"},
+        404: ejemplo(404, "Usuario no encontrado", None,
+                     [{"field": "document", "detail": "No existe un usuario activo con el documento 91234567"}], "FUN-09"),
+        422: {"description": "No se indicó documento ni correo"},
+        503: ejemplo(503, "No fue posible enviar la credencial temporal", None,
+                     [{"field": "email", "detail": "El servicio de correo (API-EXT-04) no respondió"}], "FUN-09"),
+    },
+)
+def restablecer_contrasena(
+    entrada: RestablecimientoEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-09", "No tiene permiso para restablecer contraseñas")),
+    db: Session = Depends(get_db),
+    correo=Depends(get_servicio_correo),
+):
+    entrada = entrada or RestablecimientoEntrada()
+    datos = RestablecerContrasena(db, correo).ejecutar(entrada.document, entrada.email, sesion.documento)
+    return responder(201, "Contraseña restablecida. La credencial temporal fue enviada al correo registrado", datos,
+                     funcionalidad="FUN-09")
 
 
 @router.put(

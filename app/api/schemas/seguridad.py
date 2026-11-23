@@ -16,3 +16,10 @@ class IngresoEntrada(BaseModel):
     password: str = Field("", description="Contraseña")
 
     model_config = {"json_schema_extra": {"examples": [{"username": "1098765432", "password": "********"}]}}
+
+
+class RestablecimientoEntrada(BaseModel):
+    document: str | None = Field(None, description="Documento del usuario")
+    email: str | None = Field(None, description="Correo del usuario (si no se envía el documento)")
+
+    model_config = {"json_schema_extra": {"examples": [{"document": "91234567"}]}}
