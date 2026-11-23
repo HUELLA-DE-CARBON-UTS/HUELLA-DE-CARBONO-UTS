@@ -1,5 +1,3 @@
-"""Implementación del repositorio de roles con SQLAlchemy."""
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

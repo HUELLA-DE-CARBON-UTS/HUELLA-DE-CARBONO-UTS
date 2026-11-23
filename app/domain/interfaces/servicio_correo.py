@@ -1,5 +1,3 @@
-"""Contrato del servicio de correo electrónico (API-EXT-04)."""
-
 from typing import Protocol
 
 

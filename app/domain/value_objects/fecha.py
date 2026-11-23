@@ -13,3 +13,8 @@ def en_colombia(valor: datetime | None) -> datetime | None:
     if valor.tzinfo is None:
         return valor.replace(tzinfo=ZONA_COLOMBIA)
     return valor.astimezone(ZONA_COLOMBIA)
+
+
+def texto(valor: datetime | None) -> str | None:
+    valor = en_colombia(valor)
+    return valor.replace(microsecond=0).isoformat() if valor else None
