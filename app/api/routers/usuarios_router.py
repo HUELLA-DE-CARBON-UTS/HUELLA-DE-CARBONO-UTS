@@ -6,10 +6,11 @@ from app.api.dependencies.correo import get_servicio_correo
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.api.schemas.usuario import CambioEstadoEntrada, RegistroUsuarioEntrada
+from app.api.schemas.usuario import CambioEstadoEntrada, RegistroUsuarioEntrada, TrasladoEntrada
 from app.services.use_cases.cambiar_estado_usuario import CambiarEstadoUsuario
 from app.services.use_cases.consultar_usuarios import ConsultarUsuarios
 from app.services.use_cases.registrar_usuario import MENSAJE_503 as MSG_FUN01, RegistrarUsuario
+from app.services.use_cases.reubicar_usuario import ReubicarUsuario
 
 router = APIRouter(prefix="/api/v1", tags=["MOD-01 Gestión de Usuarios"])
 
@@ -112,3 +113,33 @@ def cambiar_estado_usuario(
     entrada = entrada or CambioEstadoEntrada()
     datos = CambiarEstadoUsuario(db).ejecutar(document, entrada.status, entrada.reason, sesion.documento)
     return responder(200, "Estado del usuario actualizado correctamente", datos, funcionalidad="FUN-03")
+
+
+@router.patch(
+    "/usuarios/{document}/sede",
+    summary="HU-04 Trasladar un usuario a otra sede activa",
+    description="Reubica a un usuario activo en otra sede activa y distinta de la actual (IC-11) y registra el "
+                "traslado con sede de origen, sede de destino, fecha y responsable. Requiere el permiso FUN-04 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-04", "No fue posible reubicar al usuario"),
+    responses={
+        200: ejemplo(200, "Usuario reubicado correctamente", {
+            "document": "1098765432", "originSite": "Bucaramanga", "destinationSite": "Cúcuta",
+            "transferDate": "2026-11-03"}, None, "FUN-04"),
+        **COMUNES,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-04"},
+        404: {"description": "Usuario no encontrado"},
+        422: ejemplo(422, "La sede de destino no es válida", None,
+                     [{"field": "destinationSite", "detail": "La sede de destino es la misma sede actual del usuario"}],
+                     "FUN-04"),
+        503: {"description": "No fue posible reubicar al usuario"},
+    },
+)
+def reubicar_usuario(
+    document: str = DOCUMENTO,
+    entrada: TrasladoEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-04", "No tiene permiso para reubicar usuarios")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or TrasladoEntrada()
+    datos = ReubicarUsuario(db).ejecutar(document, entrada.destinationSite, sesion.documento)
+    return responder(200, "Usuario reubicado correctamente", datos, funcionalidad="FUN-04")
