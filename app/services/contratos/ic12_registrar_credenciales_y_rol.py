@@ -1,3 +1,6 @@
+"""IC-12 registrarCredencialesYRol: valida el rol inicial, crea las credenciales y
+asigna el rol del usuario nuevo (datos que pertenecen a MOD-02)."""
+
 import re
 
 from sqlalchemy.orm import Session
