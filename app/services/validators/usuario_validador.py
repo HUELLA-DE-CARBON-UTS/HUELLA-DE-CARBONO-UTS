@@ -5,6 +5,7 @@ from app.domain.exceptions.errores import DatosNoValidos
 FORMATO_DOCUMENTO = re.compile(r"^\d{6,12}$")
 FORMATO_CORREO = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 FORMATO_TELEFONO = re.compile(r"^\d{7,15}$")
+ESTADOS = ("active", "inactive")
 
 
 def limpiar(valor: str | None) -> str:
@@ -34,6 +35,12 @@ def error_telefono(telefono: str) -> dict | None:
         return {"field": "phone", "detail": "El teléfono debe contener solo dígitos"}
     if not FORMATO_TELEFONO.match(telefono):
         return {"field": "phone", "detail": "El teléfono debe tener entre 7 y 15 dígitos"}
+    return None
+
+
+def error_estado(estado: str) -> dict | None:
+    if estado not in ESTADOS:
+        return {"field": "status", "detail": 'El estado debe ser "active" o "inactive"'}
     return None
 
 
