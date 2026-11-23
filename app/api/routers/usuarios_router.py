@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario
@@ -7,6 +7,7 @@ from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.api.schemas.usuario import RegistroUsuarioEntrada
+from app.services.use_cases.consultar_usuarios import ConsultarUsuarios
 from app.services.use_cases.registrar_usuario import MENSAJE_503 as MSG_FUN01, RegistrarUsuario
 
 router = APIRouter(prefix="/api/v1", tags=["MOD-01 Gestión de Usuarios"])
@@ -46,3 +47,34 @@ def registrar_usuario(
     mensaje = "Usuario registrado correctamente" if enviadas else \
         "Usuario registrado correctamente, pero no fue posible enviar las credenciales al correo"
     return responder(201, mensaje, datos, funcionalidad="FUN-01")
+
+
+@router.get(
+    "/usuarios",
+    summary="HU-02 Buscar usuarios por documento, nombre, sede o estado",
+    description="Aplica al mismo tiempo todos los criterios enviados (se exige al menos uno) y retorna documento, "
+                "nombres, rol (IC-20), sede (IC-11) y estado, sin credenciales. Requiere el permiso FUN-02 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-02", "No fue posible consultar los usuarios"),
+    responses={
+        200: ejemplo(200, "Consulta de usuarios exitosa", [
+            {"document": "1098765432", "fullName": "Laura Patricia Rueda Gómez", "role": "Coordinador de operaciones",
+             "site": "Bucaramanga", "status": "active"}], None, "FUN-02"),
+        400: ejemplo(400, "Debe indicar al menos un criterio de búsqueda", None,
+                     [{"field": "criteria", "detail": "No se recibió documento, nombre, sede ni estado"}], "FUN-02"),
+        **COMUNES,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-02"},
+        404: ejemplo(404, "Sin resultados", None,
+                     [{"field": "criteria", "detail": "No hay usuarios que cumplan todos los criterios"}], "FUN-02"),
+        422: {"description": 'El estado debe ser "active" o "inactive"'},
+        503: {"description": "No fue posible consultar los usuarios"},
+    },
+)
+def consultar_usuarios(
+    document: str | None = Query(None), name: str | None = Query(None),
+    site: str | None = Query(None, description="Nombre o identificador de la sede"),
+    status: str | None = Query(None, description='"active" o "inactive"'),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-02", "No tiene permiso para consultar usuarios")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarUsuarios(db).ejecutar(document, name, site, status)
+    return responder(200, "Consulta de usuarios exitosa", datos, funcionalidad="FUN-02")

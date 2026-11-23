@@ -40,6 +40,19 @@ class UsuarioRepositorioSQLAlchemy:
         ))
         self.sesion.flush()
 
+    def buscar(self, documento=None, nombre=None, id_sedes=None, estado=None) -> list[Usuario]:
+        consulta = select(UsuarioModelo)
+        if documento:
+            consulta = consulta.where(UsuarioModelo.documento == documento)
+        if nombre:
+            consulta = consulta.where(func.lower(UsuarioModelo.nombres).contains(nombre.lower()))
+        if id_sedes is not None:
+            consulta = consulta.where(UsuarioModelo.id_sede.in_(id_sedes))
+        if estado:
+            consulta = consulta.where(UsuarioModelo.estado == estado)
+        consulta = consulta.order_by(UsuarioModelo.nombres)
+        return [_a_entidad(m) for m in self.sesion.scalars(consulta)]
+
     def por_documentos(self, documentos: list[str]) -> list[Usuario]:
         consulta = select(UsuarioModelo).where(UsuarioModelo.documento.in_(documentos)).order_by(UsuarioModelo.nombres)
         return [_a_entidad(m) for m in self.sesion.scalars(consulta)]
