@@ -28,3 +28,11 @@ class TrasladoEntrada(BaseModel):
     destinationSite: str = Field("", description="Sede de destino (nombre o identificador SED-XX)")
 
     model_config = {"json_schema_extra": {"examples": [{"destinationSite": "Cúcuta"}]}}
+
+
+class ContactoEntrada(BaseModel):
+    email: str | None = Field(None, description="Nuevo correo; si no se envía, no cambia")
+    phone: str | None = Field(None, description="Nuevo teléfono; si no se envía, no cambia")
+
+    model_config = {"json_schema_extra": {"examples": [
+        {"email": "laura.rueda@empresa-transportadora.co", "phone": "3157894512"}]}}
