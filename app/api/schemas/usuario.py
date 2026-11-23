@@ -22,3 +22,9 @@ class CambioEstadoEntrada(BaseModel):
 
     model_config = {"json_schema_extra": {"examples": [
         {"status": "inactive", "reason": "Retiro voluntario de la empresa"}]}}
+
+
+class TrasladoEntrada(BaseModel):
+    destinationSite: str = Field("", description="Sede de destino (nombre o identificador SED-XX)")
+
+    model_config = {"json_schema_extra": {"examples": [{"destinationSite": "Cúcuta"}]}}
