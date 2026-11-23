@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Body, Depends, Path
 from sqlalchemy.orm import Session
 
-from app.api.dependencies.auth import SesionUsuario
+from app.api.dependencies.auth import SesionUsuario, sesion_del_token
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.api.schemas.seguridad import ConfiguracionRolEntrada, IngresoEntrada
 from app.domain.entities.sesion import Sesion
 from app.repositories.adapters.rol_repositorio_sqlalchemy import RolRepositorioSQLAlchemy
+from app.services.use_cases.cerrar_sesion import CerrarSesion
 from app.services.use_cases.configurar_rol import ConfigurarRol
 from app.services.use_cases.iniciar_sesion import IniciarSesion
 from app.services.mappers import api
@@ -42,6 +43,33 @@ def iniciar_sesion(entrada: IngresoEntrada | None = Body(None), db: Session = De
     entrada = entrada or IngresoEntrada()
     datos, token = IniciarSesion(db).ejecutar(entrada.username, entrada.password)
     return responder(201, "Ingreso exitoso", datos, funcionalidad="FUN-06", headers={"X-Token-Sesion": token})
+
+
+@router.delete(
+    "/auth/sesiones/{sessionId}",
+    summary="HU-08 Cerrar la sesión activa",
+    description="Marca la sesión como finalizada y registra la hora de salida en la bitácora. Se envía el token "
+                "de la misma sesión que se cierra.",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-08", "No fue posible cerrar la sesión"),
+    responses={
+        200: ejemplo(200, "Sesión finalizada correctamente",
+                     {"sessionId": "SES-8F21A7", "logoutDate": "2026-11-03T18:02:00-05:00"}, None, "FUN-08"),
+        400: ejemplo(400, "El identificador de la sesión no es válido", None,
+                     [{"field": "sessionId", "detail": "Debe tener el formato SES-XXXXXX"}], "FUN-08"),
+        **SIN_SESION,
+        403: {"description": "El token enviado pertenece a otra sesión"},
+        404: ejemplo(404, "Sesión no encontrada", None,
+                     [{"field": "sessionId", "detail": "La sesión SES-8F21A7 ya fue finalizada"}], "FUN-08"),
+        503: {"description": "No fue posible cerrar la sesión"},
+    },
+)
+def cerrar_sesion(
+    sessionId: str = Path(..., description="Identificador de la sesión, formato SES-XXXXXX"),
+    sesion: Sesion = Depends(sesion_del_token),
+    db: Session = Depends(get_db),
+):
+    datos = CerrarSesion(db).ejecutar(sessionId, sesion)
+    return responder(200, "Sesión finalizada correctamente", datos, funcionalidad="FUN-08")
 
 
 @router.put(
