@@ -19,7 +19,12 @@ def consultar_rol(db: Session, referencia: str):
 
 
 def registrar_credenciales_y_rol(db: Session, documento: str, id_rol: str) -> str:
- 
+    """Crea la credencial temporal del usuario con su rol inicial.
+
+    Retorna la credencial temporal en claro únicamente para que el proceso que
+    invoca la envíe por correo (API-EXT-04); nunca se incluye en una respuesta
+    de la API ni se guarda sin cifrar. No confirma la transacción.
+    """
     temporal = generar_temporal()
     CredencialRepositorioSQLAlchemy(db).crear(documento, generar_hash(temporal), temporal=True, id_rol=id_rol)
     return temporal
