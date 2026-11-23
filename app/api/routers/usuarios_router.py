@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Path, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario
@@ -6,11 +6,14 @@ from app.api.dependencies.correo import get_servicio_correo
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.api.schemas.usuario import RegistroUsuarioEntrada
+from app.api.schemas.usuario import CambioEstadoEntrada, RegistroUsuarioEntrada
+from app.services.use_cases.cambiar_estado_usuario import CambiarEstadoUsuario
 from app.services.use_cases.consultar_usuarios import ConsultarUsuarios
 from app.services.use_cases.registrar_usuario import MENSAJE_503 as MSG_FUN01, RegistrarUsuario
 
 router = APIRouter(prefix="/api/v1", tags=["MOD-01 Gestión de Usuarios"])
+
+DOCUMENTO = Path(..., description="Documento del usuario")
 COMUNES = {401: {"description": "No hay una sesión vigente"}}
 
 
@@ -78,3 +81,34 @@ def consultar_usuarios(
 ):
     datos = ConsultarUsuarios(db).ejecutar(document, name, site, status)
     return responder(200, "Consulta de usuarios exitosa", datos, funcionalidad="FUN-02")
+
+
+@router.patch(
+    "/usuarios/{document}/estado",
+    summary="HU-03 Cambiar el estado de un usuario entre activo e inactivo",
+    description="Cambia el estado con su motivo. Al inactivar, cierra las sesiones abiertas del usuario (IC-13). "
+                "El administrador no puede inactivarse a sí mismo. Requiere el permiso FUN-03 (IC-01).",
+    response_model=RespuestaEstandar,
+    openapi_extra=ruta("FUN-03", "No fue posible actualizar el estado del usuario"),
+    responses={
+        200: ejemplo(200, "Estado del usuario actualizado correctamente", {
+            "document": "91234567", "previousStatus": "active", "newStatus": "inactive",
+            "reason": "Retiro voluntario de la empresa", "closedSessions": 1}, None, "FUN-03"),
+        **COMUNES,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-03"},
+        404: {"description": "Usuario no encontrado"},
+        409: ejemplo(409, "No es posible cambiar el estado del usuario", None,
+                     [{"field": "document", "detail": "El administrador no puede inactivarse a sí mismo"}], "FUN-03"),
+        422: {"description": "Estado no válido o motivo vacío"},
+        503: {"description": "No fue posible actualizar el estado del usuario"},
+    },
+)
+def cambiar_estado_usuario(
+    document: str = DOCUMENTO,
+    entrada: CambioEstadoEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-03", "No tiene permiso para cambiar el estado de los usuarios")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or CambioEstadoEntrada()
+    datos = CambiarEstadoUsuario(db).ejecutar(document, entrada.status, entrada.reason, sesion.documento)
+    return responder(200, "Estado del usuario actualizado correctamente", datos, funcionalidad="FUN-03")

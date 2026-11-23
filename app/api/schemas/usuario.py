@@ -14,3 +14,11 @@ class RegistroUsuarioEntrada(BaseModel):
         "email": "lrueda@empresa-transportadora.co", "phone": "3157894512",
         "role": "Coordinador de operaciones", "site": "Bucaramanga",
     }]}}
+
+
+class CambioEstadoEntrada(BaseModel):
+    status: str = Field("", description='Nuevo estado: "active" o "inactive"')
+    reason: str = Field("", description="Motivo del cambio")
+
+    model_config = {"json_schema_extra": {"examples": [
+        {"status": "inactive", "reason": "Retiro voluntario de la empresa"}]}}

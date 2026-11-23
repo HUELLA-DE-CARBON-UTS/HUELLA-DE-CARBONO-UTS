@@ -40,6 +40,15 @@ class UsuarioRepositorioSQLAlchemy:
         ))
         self.sesion.flush()
 
+    def actualizar(self, usuario: Usuario) -> None:
+        modelo = self._modelo(usuario.documento)
+        modelo.nombres = usuario.nombres
+        modelo.correo = usuario.correo
+        modelo.telefono = usuario.telefono
+        modelo.id_sede = usuario.id_sede
+        modelo.estado = usuario.estado
+        self.sesion.flush()
+
     def buscar(self, documento=None, nombre=None, id_sedes=None, estado=None) -> list[Usuario]:
         consulta = select(UsuarioModelo)
         if documento:
