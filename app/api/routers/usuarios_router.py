@@ -6,7 +6,8 @@ from app.api.dependencies.correo import get_servicio_correo
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.api.schemas.usuario import CambioEstadoEntrada, RegistroUsuarioEntrada, TrasladoEntrada
+from app.api.schemas.usuario import CambioEstadoEntrada, ContactoEntrada, RegistroUsuarioEntrada, TrasladoEntrada
+from app.services.use_cases.actualizar_contacto import ActualizarContacto
 from app.services.use_cases.cambiar_estado_usuario import CambiarEstadoUsuario
 from app.services.use_cases.consultar_usuarios import ConsultarUsuarios
 from app.services.use_cases.registrar_usuario import MENSAJE_503 as MSG_FUN01, RegistrarUsuario
@@ -143,3 +144,35 @@ def reubicar_usuario(
     entrada = entrada or TrasladoEntrada()
     datos = ReubicarUsuario(db).ejecutar(document, entrada.destinationSite, sesion.documento)
     return responder(200, "Usuario reubicado correctamente", datos, funcionalidad="FUN-04")
+
+
+@router.patch(
+    "/usuarios/{document}/contacto",
+    summary="HU-05 Modificar el correo y el teléfono de un usuario",
+    description="Actualiza el correo y/o el teléfono de un usuario activo, conservando documento, rol y sede, y "
+                "registra los valores anteriores. Requiere el permiso FUN-05 (IC-01).",
+    response_model=RespuestaEstandar,
+    openapi_extra=ruta("FUN-05", "No fue posible actualizar los datos de contacto"),
+    responses={
+        200: ejemplo(200, "Datos de contacto actualizados correctamente", {
+            "document": "1098765432", "previousEmail": "lrueda@empresa-transportadora.co",
+            "newEmail": "laura.rueda@empresa-transportadora.co", "phone": "3157894512"}, None, "FUN-05"),
+        **COMUNES,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-05"},
+        404: {"description": "Usuario no encontrado"},
+        409: ejemplo(409, "El correo ya pertenece a otro usuario", None, [
+            {"field": "email", "detail": "El correo jpabon@empresa-transportadora.co está asignado al usuario 91234567"}],
+            "FUN-05"),
+        422: {"description": "Correo o teléfono con formato no válido"},
+        503: {"description": "No fue posible actualizar los datos de contacto"},
+    },
+)
+def actualizar_contacto(
+    document: str = DOCUMENTO,
+    entrada: ContactoEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-05", "No tiene permiso para actualizar los datos de contacto")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or ContactoEntrada()
+    datos = ActualizarContacto(db).ejecutar(document, entrada.email, entrada.phone, sesion.documento)
+    return responder(200, "Datos de contacto actualizados correctamente", datos, funcionalidad="FUN-05")
