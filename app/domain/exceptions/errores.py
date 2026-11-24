@@ -1,6 +1,3 @@
-"""Errores de negocio que la API convierte en la respuesta JSON estándar (Tabla 22)."""
-
-
 class ErrorNegocio(Exception):
     codigo = 400
 
@@ -10,12 +7,20 @@ class ErrorNegocio(Exception):
         self.errores = errores or []
 
 
+class SolicitudIncorrecta(ErrorNegocio):
+    codigo = 400
+
+
 class SesionNoValida(ErrorNegocio):
     codigo = 401
 
 
 class PermisoDenegado(ErrorNegocio):
     codigo = 403
+
+
+class NoEncontrado(ErrorNegocio):
+    codigo = 404
 
 
 class Conflicto(ErrorNegocio):

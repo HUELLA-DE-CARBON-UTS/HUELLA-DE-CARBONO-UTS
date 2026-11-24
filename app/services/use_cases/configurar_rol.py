@@ -1,5 +1,3 @@
-"""Caso de uso FUN-11 / PRO-11: crear un rol o reemplazar su conjunto de permisos."""
-
 from dataclasses import dataclass
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -13,7 +11,7 @@ from app.services.validators import rol_validador
 @dataclass
 class ResultadoConfiguracion:
     rol: Rol
-    accion: str  # "creado" o "actualizado"
+    accion: str
 
 
 class ConfigurarRol:
@@ -44,7 +42,7 @@ class ConfigurarRol:
         except SQLAlchemyError as exc:
             raise ServicioNoDisponible(
                 "No fue posible guardar la configuración del rol",
-                [{"campo": "baseDeDatos", "detalle": "La base de datos no está disponible"}],
+                [{"field": "database", "detail": "La base de datos no está disponible"}],
             ) from exc
 
         guardado.permisos = permisos

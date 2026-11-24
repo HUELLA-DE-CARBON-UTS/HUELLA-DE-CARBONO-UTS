@@ -1,5 +1,3 @@
-"""Contrato del repositorio de usuarios."""
-
 from typing import Protocol
 
 from app.domain.entities.usuario import Usuario
@@ -13,3 +11,10 @@ class UsuarioRepositorio(Protocol):
     def siguiente_id(self) -> str: ...
 
     def agregar(self, usuario: Usuario, responsable: str) -> None: ...
+
+    def actualizar(self, usuario: Usuario) -> None: ...
+
+    def buscar(self, documento: str | None, nombre: str | None,
+               id_sedes: list[str] | None, estado: str | None) -> list[Usuario]: ...
+
+    def por_documentos(self, documentos: list[str]) -> list[Usuario]: ...

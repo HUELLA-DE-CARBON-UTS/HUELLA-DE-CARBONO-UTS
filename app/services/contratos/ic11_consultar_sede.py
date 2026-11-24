@@ -1,6 +1,3 @@
-"""IC-11 consultarSede: verifica que una sede exista y esté activa y obtiene su
-nombre, sin que MOD-01 lea las tablas de MOD-03."""
-
 import re
 
 from sqlalchemy.orm import Session
@@ -11,11 +8,6 @@ FORMATO_ID_SEDE = re.compile(r"^SED-\d+$", re.IGNORECASE)
 
 
 def consultar_sede(db: Session, referencia: str) -> dict:
-    """Recibe el identificador (SED-01) o el nombre de la sede.
-
-    Retorna {"existe": False} si no la encuentra, o {"existe": True, "idSede", "nombre",
-    "ciudad", "estado"}. Si el nombre corresponde a varias sedes, agrega "ambigua": True.
-    """
     repo = SedeRepositorioSQLAlchemy(db)
     referencia = " ".join((referencia or "").split())
     if FORMATO_ID_SEDE.match(referencia):
@@ -35,12 +27,27 @@ def consultar_sede(db: Session, referencia: str) -> dict:
             "estado": sede.estado}
 
 
+def nombres_de_sedes(db: Session, ids: list[str]) -> dict[str, str]:
+    ids = [i for i in set(ids) if i]
+    if not ids:
+        return {}
+    return {s.id_sede: s.nombre for s in SedeRepositorioSQLAlchemy(db).por_ids(ids)}
+
+
+def ids_de_sede(db: Session, referencia: str) -> list[str]:
+    repo = SedeRepositorioSQLAlchemy(db)
+    referencia = " ".join((referencia or "").split())
+    if FORMATO_ID_SEDE.match(referencia):
+        sede = repo.buscar_por_id(referencia.upper())
+        return [sede.id_sede] if sede else []
+    return [s.id_sede for s in repo.buscar_por_nombre(referencia)]
+
+
 def error_de_sede(info: dict, referencia: str, campo: str) -> dict | None:
-    """Detalle del error cuando la sede no sirve para asignarla a un usuario."""
     if not info["existe"]:
-        return {"campo": campo, "detalle": f"La sede {referencia} no existe"}
+        return {"field": campo, "detail": f"La sede {referencia} no existe"}
     if info.get("ambigua"):
-        return {"campo": campo, "detalle": f"Hay varias sedes llamadas {referencia}; indique su identificador (SED-XX)"}
+        return {"field": campo, "detail": f"Hay varias sedes llamadas {referencia}; indique su identificador (SED-XX)"}
     if info["estado"] != "activa":
-        return {"campo": campo, "detalle": f"La sede {info['nombre']} se encuentra inactiva"}
+        return {"field": campo, "detail": f"La sede {info['nombre']} se encuentra inactiva"}
     return None

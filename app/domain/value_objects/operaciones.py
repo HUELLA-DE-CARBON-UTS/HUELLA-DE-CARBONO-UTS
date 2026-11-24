@@ -1,8 +1,3 @@
-"""Catálogo de operaciones del sistema (FUN-01 a FUN-65, Tabla 19 del Parcial 1).
-
-Cada permiso de un rol corresponde a una de estas operaciones.
-"""
-
 OPERACIONES: dict[str, str] = {
     "FUN-01": "Registrar usuario",
     "FUN-02": "Consultar usuarios por criterio",

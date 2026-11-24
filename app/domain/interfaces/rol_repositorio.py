@@ -1,5 +1,3 @@
-"""Contrato del repositorio de roles."""
-
 from typing import Protocol
 
 from app.domain.entities.rol import Rol

@@ -1,23 +1,32 @@
-import secrets
+from dataclasses import dataclass
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
 
+from app.api.dependencies.db import get_db
+from app.domain.entities.sesion import Sesion
 from app.domain.exceptions.errores import SesionNoValida
-from app.repositories.config.settings import settings
-from app.services.use_cases.verificar_permiso import SesionUsuario
+from app.repositories.adapters.seguridad_repositorio_sqlalchemy import SesionRepositorioSQLAlchemy
 
-security = HTTPBearer(auto_error=False)
+esquema_bearer = HTTPBearer(auto_error=False, description="Token recibido en la cabecera X-Token-Sesion al iniciar sesión")
+
+SIN_SESION = SesionNoValida("No hay una sesión vigente", [
+    {"field": "session", "detail": "Debe iniciar sesión para realizar esta operación"},
+])
 
 
-def obtener_sesion(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
-) -> SesionUsuario:
-    token = (credentials.credentials if credentials else "").strip()
-    esperado = settings.token_admin_inicial
-    if not token or not esperado or not secrets.compare_digest(token, esperado):
-        raise SesionNoValida("No hay una sesión vigente", [
-            {"campo": "sesion", "detalle": "Debe iniciar sesión para realizar esta operación"},
-        ])
-    return SesionUsuario(documento=settings.documento_admin_inicial, rol="Administrador")
-    return SesionUsuario(documento=settings.documento_admin_inicial, rol="Administrador")
+@dataclass
+class SesionUsuario:
+    id_sesion: str
+    documento: str
+
+
+def sesion_del_token(credenciales: HTTPAuthorizationCredentials | None = Depends(esquema_bearer),
+                     db: Session = Depends(get_db)) -> Sesion:
+    if credenciales is None or not credenciales.credentials:
+        raise SIN_SESION
+    sesion = SesionRepositorioSQLAlchemy(db).buscar_por_token(credenciales.credentials)
+    if sesion is None:
+        raise SIN_SESION
+    return sesion
