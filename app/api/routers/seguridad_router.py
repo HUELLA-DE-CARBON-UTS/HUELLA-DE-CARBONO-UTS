@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario, sesion_del_token
@@ -12,7 +12,7 @@ from app.domain.entities.sesion import Sesion
 from app.repositories.adapters.rol_repositorio_sqlalchemy import RolRepositorioSQLAlchemy
 from app.services.use_cases.cerrar_sesion import CerrarSesion
 from app.services.use_cases.configurar_rol import ConfigurarRol
-from app.services.use_cases.gestion_roles import CambiarRolUsuario
+from app.services.use_cases.gestion_roles import CambiarRolUsuario, ConsultarRoles
 from app.services.use_cases.iniciar_sesion import IniciarSesion
 from app.services.use_cases.restablecer_contrasena import RestablecerContrasena
 from app.services.mappers import api
@@ -138,6 +138,35 @@ def cambiar_rol_usuario(
     entrada = entrada or CambioRolEntrada()
     datos = CambiarRolUsuario(db).ejecutar(document, entrada.role, sesion.documento)
     return responder(200, "Rol actualizado correctamente", datos, funcionalidad="FUN-12")
+
+
+@router.get(
+    "/roles",
+    summary="HU-13 Consultar los roles con sus permisos y su número de usuarios",
+    description="Retorna cada rol con su estado, sus permisos y su número de usuarios activos (IC-14). El filtro "
+                "por estado es opcional. Requiere el permiso FUN-13 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-13", ConsultarRoles.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de roles exitosa", [
+            {"roleId": "ROL-01", "name": "Administrador", "status": "active",
+             "permissions": ["FUN-01", "FUN-02", "FUN-11", "FUN-16"], "activeUsers": 2}], None, "FUN-13"),
+        **SIN_SESION,
+        403: ejemplo(403, "No tiene permiso para consultar los roles", None, [
+            {"field": "session", "detail": "El rol Coordinador de operaciones no tiene autorizada la operación FUN-13"}],
+            "FUN-13"),
+        404: ejemplo(404, "Sin resultados", None, [{"field": "status", "detail": "No hay roles en estado inactivo"}],
+                     "FUN-13"),
+        422: {"description": 'El estado debe ser "active" o "inactive"'},
+        503: {"description": ConsultarRoles.MENSAJE_503},
+    },
+)
+def consultar_roles(
+    status: str | None = Query(None, description='"active" o "inactive"'),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-13", "No tiene permiso para consultar los roles")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarRoles(db).ejecutar(status)
+    return responder(200, "Consulta de roles exitosa", datos, funcionalidad="FUN-13")
 
 
 @router.put(
