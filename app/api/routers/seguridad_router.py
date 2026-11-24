@@ -6,11 +6,13 @@ from app.api.dependencies.correo import get_servicio_correo
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.api.schemas.seguridad import ConfiguracionRolEntrada, IngresoEntrada, RestablecimientoEntrada
+from app.api.schemas.seguridad import (
+    CambioRolEntrada, ConfiguracionRolEntrada, IngresoEntrada, RestablecimientoEntrada)
 from app.domain.entities.sesion import Sesion
 from app.repositories.adapters.rol_repositorio_sqlalchemy import RolRepositorioSQLAlchemy
 from app.services.use_cases.cerrar_sesion import CerrarSesion
 from app.services.use_cases.configurar_rol import ConfigurarRol
+from app.services.use_cases.gestion_roles import CambiarRolUsuario
 from app.services.use_cases.iniciar_sesion import IniciarSesion
 from app.services.use_cases.restablecer_contrasena import RestablecerContrasena
 from app.services.mappers import api
@@ -105,6 +107,37 @@ def restablecer_contrasena(
     datos = RestablecerContrasena(db, correo).ejecutar(entrada.document, entrada.email, sesion.documento)
     return responder(201, "Contraseña restablecida. La credencial temporal fue enviada al correo registrado", datos,
                      funcionalidad="FUN-09")
+
+
+@router.put(
+    "/roles/asignaciones/{document}",
+    summary="HU-12 Cambiar el rol asignado a un usuario activo",
+    description="Reemplaza el rol del usuario por otro rol activo. Los nuevos permisos aplican desde su siguiente "
+                "operación. Requiere el permiso FUN-12 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-12", CambiarRolUsuario.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Rol actualizado correctamente", {
+            "document": "91234567", "previousRole": "Coordinador de operaciones", "newRole": "Analista ambiental",
+            "appliesFrom": "next_operation"}, None, "FUN-12"),
+        **SIN_SESION,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-12"},
+        404: {"description": "Usuario no encontrado"},
+        409: ejemplo(409, "El usuario ya tiene asignado ese rol", None,
+                     [{"field": "role", "detail": "El usuario 91234567 ya tiene el rol Analista ambiental"}], "FUN-12"),
+        422: ejemplo(422, "El rol indicado no está disponible", None,
+                     [{"field": "role", "detail": "El rol Auditor se encuentra inactivo"}], "FUN-12"),
+        503: {"description": CambiarRolUsuario.MENSAJE_503},
+    },
+)
+def cambiar_rol_usuario(
+    document: str = Path(..., description="Documento del usuario"),
+    entrada: CambioRolEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-12", "No tiene permiso para cambiar el rol de los usuarios")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or CambioRolEntrada()
+    datos = CambiarRolUsuario(db).ejecutar(document, entrada.role, sesion.documento)
+    return responder(200, "Rol actualizado correctamente", datos, funcionalidad="FUN-12")
 
 
 @router.put(
