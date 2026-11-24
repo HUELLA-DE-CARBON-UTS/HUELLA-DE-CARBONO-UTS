@@ -17,8 +17,6 @@ SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
 
 @router.post(
     "/sedes",
-    response_model=RespuestaEstandar, 
-    status_code=201,
     summary="HU-16 Registrar una nueva sede",
     description="Registra una sede con su nombre, ciudad, dirección y responsable. La sede queda en estado "
                 "«active» con su fecha de creación. No se permiten dos sedes con el mismo nombre en la misma "
@@ -36,7 +34,7 @@ SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
                      [{"field": "name", "detail": "La sede Barranquilla ya está registrada en Barranquilla"}], "FUN-16"),
         422: {"description": "Falta un campo obligatorio o supera su longitud"},
         503: {"description": "No fue posible registrar la sede"},
-    }
+    },
 )
 def registrar_sede(
     entrada: SedeEntrada | None = Body(None),

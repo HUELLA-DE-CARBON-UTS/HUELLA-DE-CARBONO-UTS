@@ -7,6 +7,7 @@ from app.api.middleware.manejo_errores import registrar_manejadores
 from app.api.routers import parametrizacion_router, seguridad_router, usuarios_router
 from app.repositories.config.settings import settings
 from app.repositories.database.conexion import SessionLocal, engine
+from app.repositories.database.inicializacion import inicializar_base_de_datos
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,7 +25,6 @@ app = FastAPI(
     version="0.2.0",
     lifespan=ciclo_de_vida,
 )
-
 registrar_manejadores(app)
 app.include_router(usuarios_router.router)
 app.include_router(seguridad_router.router)
