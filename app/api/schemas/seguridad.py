@@ -23,3 +23,9 @@ class RestablecimientoEntrada(BaseModel):
     email: str | None = Field(None, description="Correo del usuario (si no se envía el documento)")
 
     model_config = {"json_schema_extra": {"examples": [{"document": "91234567"}]}}
+
+
+class CambioRolEntrada(BaseModel):
+    role: str = Field("", description="Nuevo rol (nombre o identificador ROL-XX)")
+
+    model_config = {"json_schema_extra": {"examples": [{"role": "Analista ambiental"}]}}

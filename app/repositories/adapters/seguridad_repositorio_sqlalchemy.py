@@ -43,6 +43,13 @@ class CredencialRepositorioSQLAlchemy:
         m.fecha_actualizacion = ahora()
         self.sesion.flush()
 
+    def cambiar_rol(self, documento: str, id_rol: str) -> None:
+        m = self._modelo(documento)
+        m.id_rol = id_rol
+        m.fecha_actualizacion = ahora()
+        self.sesion.flush()
+        self.sesion.expire(m, ["rol"])
+
 
 def _sesion(m: SesionModelo) -> Sesion:
     return Sesion(id_sesion=m.id_sesion, documento=m.documento, estado=m.estado,
