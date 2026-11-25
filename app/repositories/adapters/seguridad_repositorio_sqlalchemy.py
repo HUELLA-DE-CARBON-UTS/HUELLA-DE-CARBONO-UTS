@@ -50,6 +50,9 @@ class CredencialRepositorioSQLAlchemy:
         self.sesion.flush()
         self.sesion.expire(m, ["rol"])
 
+    def documentos_con_rol(self, id_rol: str) -> list[str]:
+        return list(self.sesion.scalars(select(CredencialModelo.documento).where(CredencialModelo.id_rol == id_rol)))
+
 
 def _sesion(m: SesionModelo) -> Sesion:
     return Sesion(id_sesion=m.id_sesion, documento=m.documento, estado=m.estado,

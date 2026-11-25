@@ -1,5 +1,3 @@
-"""Sesión de base de datos por solicitud."""
-
 from collections.abc import Iterator
 
 from sqlalchemy.orm import Session
