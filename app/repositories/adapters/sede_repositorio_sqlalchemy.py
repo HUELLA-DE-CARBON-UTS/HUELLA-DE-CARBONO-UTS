@@ -21,11 +21,13 @@ class SedeRepositorioSQLAlchemy:
     def __init__(self, sesion: Session):
         self.sesion = sesion
 
-    def existe_en_ciudad(self, nombre: str, ciudad: str) -> bool:
+    def existe_en_ciudad(self, nombre: str, ciudad: str, excluir: str | None = None) -> bool:
         consulta = select(SedeModelo.id_sede).where(
             func.lower(SedeModelo.nombre) == nombre.lower(),
             func.lower(SedeModelo.ciudad) == ciudad.lower(),
         )
+        if excluir:
+            consulta = consulta.where(SedeModelo.id_sede != excluir)
         return self.sesion.scalar(consulta) is not None
 
     def buscar_por_id(self, id_sede: str) -> Sede | None:
@@ -47,6 +49,15 @@ class SedeRepositorioSQLAlchemy:
             consulta = consulta.where(SedeModelo.estado == estado)
         consulta = consulta.order_by(SedeModelo.ciudad, SedeModelo.nombre)
         return [_a_entidad(m) for m in self.sesion.scalars(consulta)]
+
+    def actualizar(self, sede: Sede) -> Sede:
+        modelo = self.sesion.get(SedeModelo, sede.id_sede)
+        modelo.nombre = sede.nombre
+        modelo.ciudad = sede.ciudad
+        modelo.direccion = sede.direccion
+        modelo.responsable = sede.responsable
+        self.sesion.flush()
+        return _a_entidad(modelo)
 
     def siguiente_id(self) -> str:
         ids = self.sesion.scalars(select(SedeModelo.id_sede)).all()
