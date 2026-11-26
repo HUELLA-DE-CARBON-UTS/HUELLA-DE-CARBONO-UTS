@@ -29,3 +29,10 @@ class CambioRolEntrada(BaseModel):
     role: str = Field("", description="Nuevo rol (nombre o identificador ROL-XX)")
 
     model_config = {"json_schema_extra": {"examples": [{"role": "Analista ambiental"}]}}
+
+
+class InactivacionRolEntrada(BaseModel):
+    reason: str = Field("", description="Motivo de la inactivación")
+
+    model_config = {"json_schema_extra": {"examples": [
+        {"reason": "El cargo se eliminó de la estructura de la empresa"}]}}

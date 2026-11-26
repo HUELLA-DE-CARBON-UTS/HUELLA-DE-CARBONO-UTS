@@ -7,17 +7,19 @@ from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.api.schemas.seguridad import (
-    CambioRolEntrada, ConfiguracionRolEntrada, IngresoEntrada, RestablecimientoEntrada)
+    CambioRolEntrada, ConfiguracionRolEntrada, InactivacionRolEntrada, IngresoEntrada, RestablecimientoEntrada)
 from app.domain.entities.sesion import Sesion
 from app.repositories.adapters.rol_repositorio_sqlalchemy import RolRepositorioSQLAlchemy
 from app.services.use_cases.cerrar_sesion import CerrarSesion
 from app.services.use_cases.configurar_rol import ConfigurarRol
-from app.services.use_cases.gestion_roles import CambiarRolUsuario, ConsultarRoles
+from app.services.use_cases.gestion_roles import CambiarRolUsuario, ConsultarRoles, InactivarRol
 from app.services.use_cases.iniciar_sesion import IniciarSesion
 from app.services.use_cases.restablecer_contrasena import RestablecerContrasena
 from app.services.mappers import api
 
 router = APIRouter(prefix="/api/v1", tags=["MOD-02 Gestión de Seguridad"])
+
+ID_ROL = Path(..., description="Identificador del rol, por ejemplo ROL-04")
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
 
 
@@ -201,3 +203,35 @@ def configurar_rol(
     }
     codigo = 201 if resultado.accion == "creado" else 200
     return responder(codigo, "Rol configurado correctamente", datos, funcionalidad="FUN-11")
+
+
+@router.patch(
+    "/roles/{roleId}/estado",
+    summary="HU-14 Inactivar un rol que ningún usuario activo utiliza",
+    description="Cambia el rol a «inactive» conservando sus permisos. Si hay usuarios activos con el rol, se "
+                "rechaza e informa cuántos son (IC-14). Requiere el permiso FUN-14 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-14", InactivarRol.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Rol inactivado correctamente", {
+            "roleId": "ROL-06", "name": "Auxiliar de despacho", "status": "inactive",
+            "reason": "El cargo se eliminó de la estructura de la empresa"}, None, "FUN-14"),
+        400: {"description": "El identificador no tiene el formato ROL-XX"},
+        **SIN_SESION,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-14"},
+        404: ejemplo(404, "Rol no encontrado", None,
+                     [{"field": "roleId", "detail": "No existe un rol activo con el identificador ROL-99"}], "FUN-14"),
+        409: ejemplo(409, "El rol tiene usuarios activos asignados", None,
+                     [{"field": "roleId", "detail": "El rol ROL-03 tiene 4 usuarios activos"}], "FUN-14"),
+        422: {"description": "Motivo vacío"},
+        503: {"description": InactivarRol.MENSAJE_503},
+    },
+)
+def inactivar_rol(
+    roleId: str = ID_ROL,
+    entrada: InactivacionRolEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-14", "No tiene permiso para inactivar roles")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or InactivacionRolEntrada()
+    datos = InactivarRol(db).ejecutar(roleId, entrada.reason, sesion.documento)
+    return responder(200, "Rol inactivado correctamente", datos, funcionalidad="FUN-14")
