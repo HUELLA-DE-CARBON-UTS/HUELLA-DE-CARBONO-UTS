@@ -113,3 +113,15 @@ class BitacoraRepositorioSQLAlchemy:
                                              operacion=evento.operacion, id_sesion=evento.id_sesion,
                                              fecha=evento.fecha))
         self.sesion.flush()
+
+    def consultar(self, desde: datetime, hasta: datetime, usuario: str | None = None,
+                  tipo_evento: str | None = None) -> list[EventoBitacora]:
+        consulta = select(EventoBitacoraModelo).where(EventoBitacoraModelo.fecha >= desde,
+                                                      EventoBitacoraModelo.fecha < hasta)
+        if usuario:
+            consulta = consulta.where(EventoBitacoraModelo.usuario == usuario)
+        if tipo_evento:
+            consulta = consulta.where(EventoBitacoraModelo.tipo_evento == tipo_evento)
+        consulta = consulta.order_by(EventoBitacoraModelo.fecha.desc(), EventoBitacoraModelo.id.desc())
+        return [EventoBitacora(usuario=m.usuario, tipo_evento=m.tipo_evento, operacion=m.operacion,
+                               fecha=m.fecha, id_sesion=m.id_sesion) for m in self.sesion.scalars(consulta)]

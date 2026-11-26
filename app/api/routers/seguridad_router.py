@@ -12,6 +12,7 @@ from app.domain.entities.sesion import Sesion
 from app.repositories.adapters.rol_repositorio_sqlalchemy import RolRepositorioSQLAlchemy
 from app.services.use_cases.cerrar_sesion import CerrarSesion
 from app.services.use_cases.configurar_rol import ConfigurarRol
+from app.services.use_cases.consultar_bitacora import ConsultarBitacora
 from app.services.use_cases.gestion_roles import CambiarRolUsuario, ConsultarRoles, ConsultarUsuariosDeRol, InactivarRol
 from app.services.use_cases.iniciar_sesion import IniciarSesion
 from app.services.use_cases.restablecer_contrasena import RestablecerContrasena
@@ -109,6 +110,39 @@ def restablecer_contrasena(
     datos = RestablecerContrasena(db, correo).ejecutar(entrada.document, entrada.email, sesion.documento)
     return responder(201, "Contraseña restablecida. La credencial temporal fue enviada al correo registrado", datos,
                      funcionalidad="FUN-09")
+
+
+@router.get(
+    "/auth/bitacora",
+    summary="HU-10 Consultar la bitácora de accesos por rango de fechas",
+    description="Retorna ingresos, intentos fallidos, operaciones rechazadas y salidas del rango, del más reciente "
+                "al más antiguo. Filtros opcionales: user (documento) y eventType (login, failed_login, "
+                "rejected_operation o logout). Requiere el permiso FUN-10 (IC-01).",
+    response_model=RespuestaEstandar,
+    openapi_extra=ruta("FUN-10", "No fue posible consultar la bitácora de accesos"),
+    responses={
+        200: ejemplo(200, "Consulta de bitácora exitosa", [
+            {"user": "1098765432", "eventType": "rejected_operation", "operation": "FUN-11",
+             "date": "2026-11-02T16:40:00-05:00"}], None, "FUN-10"),
+        **SIN_SESION,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-10"},
+        404: ejemplo(404, "Sin registros en el periodo", None,
+                     [{"field": "startDate", "detail": "No hay eventos entre 2026-10-01 y 2026-10-02"}], "FUN-10"),
+        422: ejemplo(422, "El rango de fechas no es válido", None, [
+            {"field": "startDate", "detail": "La fecha inicial no puede ser posterior a la fecha final"}], "FUN-10"),
+        503: {"description": "No fue posible consultar la bitácora de accesos"},
+    },
+)
+def consultar_bitacora(
+    startDate: str | None = Query(None, description="YYYY-MM-DD"),
+    endDate: str | None = Query(None, description="YYYY-MM-DD"),
+    user: str | None = Query(None, description="Documento del usuario"),
+    eventType: str | None = Query(None, description="login, failed_login, rejected_operation o logout"),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-10", "No tiene permiso para consultar la bitácora de accesos")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarBitacora(db).ejecutar(startDate, endDate, user, eventType)
+    return responder(200, "Consulta de bitácora exitosa", datos, funcionalidad="FUN-10")
 
 
 @router.put(
