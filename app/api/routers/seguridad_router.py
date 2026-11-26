@@ -12,7 +12,7 @@ from app.domain.entities.sesion import Sesion
 from app.repositories.adapters.rol_repositorio_sqlalchemy import RolRepositorioSQLAlchemy
 from app.services.use_cases.cerrar_sesion import CerrarSesion
 from app.services.use_cases.configurar_rol import ConfigurarRol
-from app.services.use_cases.gestion_roles import CambiarRolUsuario, ConsultarRoles, InactivarRol
+from app.services.use_cases.gestion_roles import CambiarRolUsuario, ConsultarRoles, ConsultarUsuariosDeRol, InactivarRol
 from app.services.use_cases.iniciar_sesion import IniciarSesion
 from app.services.use_cases.restablecer_contrasena import RestablecerContrasena
 from app.services.mappers import api
@@ -235,3 +235,31 @@ def inactivar_rol(
     entrada = entrada or InactivacionRolEntrada()
     datos = InactivarRol(db).ejecutar(roleId, entrada.reason, sesion.documento)
     return responder(200, "Rol inactivado correctamente", datos, funcionalidad="FUN-14")
+
+
+@router.get(
+    "/roles/{roleId}/usuarios",
+    summary="HU-15 Consultar los usuarios que tienen asignado un rol",
+    description="Retorna los usuarios activos e inactivos con el rol, con su sede y su estado (IC-14). "
+                "Requiere el permiso FUN-15 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-15", ConsultarUsuariosDeRol.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de usuarios del rol exitosa", [
+            {"document": "1098765432", "fullName": "Laura Patricia Rueda Gómez", "site": "Bucaramanga",
+             "status": "active"}], None, "FUN-15"),
+        400: ejemplo(400, "El identificador del rol no es válido", None,
+                     [{"field": "roleId", "detail": "Debe tener el formato ROL-XX"}], "FUN-15"),
+        **SIN_SESION,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-15"},
+        404: ejemplo(404, "Rol no encontrado", None,
+                     [{"field": "roleId", "detail": "No existe un rol con el identificador ROL-99"}], "FUN-15"),
+        503: {"description": ConsultarUsuariosDeRol.MENSAJE_503},
+    },
+)
+def consultar_usuarios_de_rol(
+    roleId: str = ID_ROL,
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-15", "No tiene permiso para consultar los usuarios de un rol")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarUsuariosDeRol(db).ejecutar(roleId)
+    return responder(200, "Consulta de usuarios del rol exitosa", datos, funcionalidad="FUN-15")
