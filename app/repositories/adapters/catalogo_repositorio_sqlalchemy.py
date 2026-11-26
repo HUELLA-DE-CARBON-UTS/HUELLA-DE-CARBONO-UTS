@@ -32,9 +32,22 @@ class CatalogoRepositorioSQLAlchemy:
         return ElementoCatalogo(id=self._id(modelo), nombre=modelo.nombre, descripcion=modelo.descripcion,
                                 estado=modelo.estado)
 
+    def _factor(self, modelo) -> Factor:
+        return Factor(valor=modelo.valor, vigente_desde=modelo.vigente_desde, vigente_hasta=modelo.vigente_hasta,
+                      responsable=modelo.responsable, fuente=getattr(modelo, "fuente", None), id=modelo.id)
+
+    def _columna_factor(self):
+        return getattr(self.c.modelo_factor, self.c.columna_id)
+
     def buscar_por_nombre(self, nombre: str) -> ElementoCatalogo | None:
         modelo = self.sesion.scalar(select(self.c.modelo).where(func.lower(self.c.modelo.nombre) == nombre.lower()))
         return self._elemento(modelo) if modelo else None
+
+    def listar(self, estado: str | None = None) -> list[ElementoCatalogo]:
+        consulta = select(self.c.modelo).order_by(getattr(self.c.modelo, self.c.columna_id))
+        if estado:
+            consulta = consulta.where(self.c.modelo.estado == estado)
+        return [self._elemento(m) for m in self.sesion.scalars(consulta)]
 
     def siguiente_id(self) -> str:
         ids = self.sesion.scalars(select(getattr(self.c.modelo, self.c.columna_id))).all()
@@ -47,6 +60,11 @@ class CatalogoRepositorioSQLAlchemy:
                                       fecha_creacion=ahora(), responsable=factor.responsable))
         self.sesion.flush()
         self.agregar_factor(elemento.id, factor)
+
+    def factores(self, identificador: str) -> list[Factor]:
+        consulta = (select(self.c.modelo_factor).where(self._columna_factor() == identificador)
+                    .order_by(self.c.modelo_factor.vigente_desde.desc()))
+        return [self._factor(m) for m in self.sesion.scalars(consulta)]
 
     def agregar_factor(self, identificador: str, factor: Factor) -> None:
         datos = {self.c.columna_id: identificador, "valor": factor.valor, "vigente_desde": factor.vigente_desde,

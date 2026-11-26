@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 
 from app.domain.entities.catalogo import ElementoCatalogo, Factor
-from app.domain.exceptions.errores import Conflicto
+from app.domain.exceptions.errores import Conflicto, DatosNoValidos, NoEncontrado
 from app.repositories.adapters.catalogo_repositorio_sqlalchemy import TIPOS_VEHICULO, CatalogoRepositorioSQLAlchemy
 from app.services.mappers import api
+from app.services.use_cases.catalogo_comun import factor_del_dia, hoy, plural_estado
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import catalogo_validador as v
 
@@ -42,3 +43,35 @@ class RegistrarTipoVehiculo:
 
         return {"typeId": tipo.id, "name": tipo.nombre, "status": api.estado(tipo.estado),
                 "consumptionFactorLkm": valor, "validFrom": desde.isoformat()}
+
+
+class ConsultarTiposVehiculo:
+
+    MENSAJE_503 = "No fue posible consultar los tipos de vehículo"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = CatalogoRepositorioSQLAlchemy(db, TIPOS_VEHICULO)
+
+    def ejecutar(self, estado: str | None = None) -> list[dict]:
+        estado = v.limpiar(estado).lower() or None
+        if estado and v.error_estado(estado):
+            raise DatosNoValidos("Los criterios de consulta no son válidos", [v.error_estado(estado)])
+        estado = api.estado_interno(estado) if estado else None
+
+        with transaccion(self.db, self.MENSAJE_503):
+            tipos = self.repositorio.listar(estado)
+            if not tipos:
+                detalle = f"No hay tipos de vehículo {plural_estado(estado)}" if estado else \
+                    "No hay tipos de vehículo registrados"
+                raise NoEncontrado("Sin resultados", [{"field": "status", "detail": detalle}])
+            dia = hoy()
+            datos = []
+            for tipo in tipos:
+                vigente = factor_del_dia(self.repositorio.factores(tipo.id), dia)
+                fila = {"typeId": tipo.id, "name": tipo.nombre, "status": api.estado(tipo.estado),
+                        "currentFactorLkm": vigente.valor if vigente else None}
+                if vigente is None:
+                    fila["noCurrentFactor"] = True
+                datos.append(fila)
+            return datos

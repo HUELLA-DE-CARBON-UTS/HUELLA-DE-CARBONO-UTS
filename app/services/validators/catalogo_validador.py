@@ -2,6 +2,8 @@ import re
 from datetime import date
 
 from app.domain.exceptions.errores import DatosNoValidos
+
+ESTADOS = ("active", "inactive")
 FORMATO_FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -35,6 +37,12 @@ def error_texto(campo: str, valor: str, mensaje_vacio: str, maximo: int) -> dict
 def error_fecha(campo: str, valor: date | None) -> dict | None:
     if valor is None:
         return {"field": campo, "detail": "La fecha de inicio es obligatoria y debe tener el formato AAAA-MM-DD"}
+    return None
+
+
+def error_estado(estado: str) -> dict | None:
+    if estado not in ESTADOS:
+        return {"field": "status", "detail": 'El estado debe ser "active" o "inactive"'}
     return None
 
 
