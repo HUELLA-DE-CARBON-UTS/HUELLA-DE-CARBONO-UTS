@@ -28,6 +28,12 @@ class RolRepositorioSQLAlchemy:
         modelo = self.sesion.get(RolModelo, id_rol)
         return _a_entidad(modelo) if modelo else None
 
+    def listar(self, estado: str | None = None) -> list[Rol]:
+        consulta = select(RolModelo).order_by(RolModelo.id_rol)
+        if estado:
+            consulta = consulta.where(RolModelo.estado == estado)
+        return [_a_entidad(m) for m in self.sesion.scalars(consulta)]
+
     def operaciones_existentes(self, codigos: list[str]) -> set[str]:
         consulta = select(OperacionModelo.codigo).where(OperacionModelo.codigo.in_(codigos))
         return set(self.sesion.scalars(consulta))

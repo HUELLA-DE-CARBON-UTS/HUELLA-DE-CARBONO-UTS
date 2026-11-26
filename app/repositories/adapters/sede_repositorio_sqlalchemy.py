@@ -39,6 +39,15 @@ class SedeRepositorioSQLAlchemy:
     def por_ids(self, ids: list[str]) -> list[Sede]:
         return [_a_entidad(m) for m in self.sesion.scalars(select(SedeModelo).where(SedeModelo.id_sede.in_(ids)))]
 
+    def listar(self, ciudad: str | None = None, estado: str | None = None) -> list[Sede]:
+        consulta = select(SedeModelo)
+        if ciudad:
+            consulta = consulta.where(func.lower(SedeModelo.ciudad) == ciudad.lower())
+        if estado:
+            consulta = consulta.where(SedeModelo.estado == estado)
+        consulta = consulta.order_by(SedeModelo.ciudad, SedeModelo.nombre)
+        return [_a_entidad(m) for m in self.sesion.scalars(consulta)]
+
     def siguiente_id(self) -> str:
         ids = self.sesion.scalars(select(SedeModelo.id_sede)).all()
         mayor = max((int(i.split("-")[1]) for i in ids), default=0)
