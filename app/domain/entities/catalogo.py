@@ -18,3 +18,6 @@ class Factor:
     responsable: str = ""
     fuente: str | None = None
     id: int | None = None
+
+    def aplica_en(self, dia: date) -> bool:
+        return self.vigente_desde <= dia and (self.vigente_hasta is None or dia <= self.vigente_hasta)

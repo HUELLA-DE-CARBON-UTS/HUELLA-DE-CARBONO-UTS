@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario
@@ -6,7 +6,7 @@ from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.catalogo import TipoVehiculoEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.catalogo_vehiculos import RegistrarTipoVehiculo
+from app.services.use_cases.catalogo_vehiculos import ConsultarTiposVehiculo, RegistrarTipoVehiculo
 
 router = APIRouter(prefix="/api/v1/catalogos", tags=["MOD-03 Parametrización"])
 
@@ -49,3 +49,33 @@ def registrar_tipo_vehiculo(
     datos = RegistrarTipoVehiculo(db).ejecutar(entrada.name, entrada.description, entrada.consumptionFactorLkm,
                                                entrada.startDate, sesion.documento)
     return responder(201, "Tipo de vehículo registrado correctamente", datos, funcionalidad="FUN-21")
+
+
+@router.get(
+    "/tipos-vehiculo",
+    summary="HU-23 Consultar los tipos de vehículo con su factor de consumo vigente",
+    description="Retorna los tipos de vehículo con el factor en L/km vigente en la fecha de consulta. Los tipos "
+                "sin factor vigente se señalan con noCurrentFactor = true. El filtro por estado es opcional. "
+                "Requiere el permiso FUN-23 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-23", ConsultarTiposVehiculo.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de tipos de vehículo exitosa", [
+            {"typeId": "TV-01", "name": "Camión sencillo", "status": "active", "currentFactorLkm": 0.095},
+            {"typeId": "TV-04", "name": "Furgón eléctrico", "status": "active", "currentFactorLkm": None,
+             "noCurrentFactor": True}], None, "FUN-23"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-23", "No tiene permiso para consultar el catálogo"),
+        404: ejemplo(404, "Sin resultados", None,
+                     [{"field": "status", "detail": "No hay tipos de vehículo inactivos"}], "FUN-23"),
+        422: ejemplo(422, "Los criterios de consulta no son válidos", None,
+                     [{"field": "status", "detail": 'El estado debe ser "active" o "inactive"'}], "FUN-23"),
+        503: {"description": ConsultarTiposVehiculo.MENSAJE_503},
+    },
+)
+def consultar_tipos_vehiculo(
+    status: str | None = Query(None, description='"active" o "inactive"'),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-23", "No tiene permiso para consultar el catálogo")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarTiposVehiculo(db).ejecutar(status)
+    return responder(200, "Consulta de tipos de vehículo exitosa", datos, funcionalidad="FUN-23")
