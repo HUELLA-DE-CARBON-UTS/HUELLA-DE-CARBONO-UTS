@@ -4,11 +4,17 @@ from app.domain.entities.catalogo import ElementoCatalogo, Factor
 from app.domain.exceptions.errores import Conflicto, DatosNoValidos, NoEncontrado
 from app.repositories.adapters.catalogo_repositorio_sqlalchemy import TIPOS_VEHICULO, CatalogoRepositorioSQLAlchemy
 from app.services.mappers import api
-from app.services.use_cases.catalogo_comun import factor_del_dia, hoy, plural_estado
+from app.services.use_cases.catalogo_comun import factor_del_dia, hoy, plural_estado, reemplazar_factor
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import catalogo_validador as v
 
 CAMPO_FACTOR = "consumptionFactorLkm"
+
+
+def _no_encontrado(identificador: str, activo: bool) -> NoEncontrado:
+    detalle = "un tipo activo" if activo else "un tipo"
+    return NoEncontrado("Tipo de vehículo no encontrado", [
+        {"field": "typeId", "detail": f"No existe {detalle} con el identificador {identificador}"}])
 
 
 class RegistrarTipoVehiculo:
@@ -43,6 +49,41 @@ class RegistrarTipoVehiculo:
 
         return {"typeId": tipo.id, "name": tipo.nombre, "status": api.estado(tipo.estado),
                 "consumptionFactorLkm": valor, "validFrom": desde.isoformat()}
+
+
+class ActualizarFactorConsumo:
+
+    MENSAJE_503 = "No fue posible actualizar el factor de consumo"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = CatalogoRepositorioSQLAlchemy(db, TIPOS_VEHICULO)
+
+    def ejecutar(self, id_tipo: str, factor, fecha_inicio, responsable: str) -> dict:
+        id_tipo = (id_tipo or "").strip().upper()
+        valor, desde = v.numero(factor), v.fecha(fecha_inicio)
+        error_factor = None
+        if valor is None:
+            error_factor = {"field": CAMPO_FACTOR, "detail": "Debe ser numérico y mayor que 0"}
+        elif valor <= 0:
+            error_factor = {"field": CAMPO_FACTOR, "detail": "Debe ser mayor que 0"}
+        v.lanzar([error_factor, v.error_fecha("startDate", desde)],
+                 "Los datos del nuevo factor no son válidos", CAMPO_FACTOR, "El factor de consumo no es válido")
+
+        with transaccion(self.db, self.MENSAJE_503):
+            tipo = self.repositorio.buscar(id_tipo)
+            if tipo is None or tipo.estado != "activo":
+                raise _no_encontrado(id_tipo, True)
+            nuevo = Factor(valor=valor, vigente_desde=desde, responsable=responsable)
+            anterior = reemplazar_factor(self.repositorio, id_tipo, nuevo)
+            self.db.commit()
+
+        return {
+            "typeId": id_tipo,
+            "previousFactor": {"valueLkm": anterior.valor, "validTo": anterior.vigente_hasta.isoformat()}
+            if anterior else None,
+            "newFactor": {"valueLkm": valor, "validFrom": desde.isoformat()},
+        }
 
 
 class ConsultarTiposVehiculo:

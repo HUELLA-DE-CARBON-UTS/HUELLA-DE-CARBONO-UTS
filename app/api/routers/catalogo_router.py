@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Path, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
-from app.api.schemas.catalogo import TipoVehiculoEntrada
+from app.api.schemas.catalogo import FactorConsumoEntrada, TipoVehiculoEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.catalogo_vehiculos import ConsultarTiposVehiculo, RegistrarTipoVehiculo
+from app.services.use_cases.catalogo_vehiculos import (
+    ActualizarFactorConsumo, ConsultarTiposVehiculo, RegistrarTipoVehiculo)
 
 router = APIRouter(prefix="/api/v1/catalogos", tags=["MOD-03 Parametrización"])
 
@@ -79,3 +80,38 @@ def consultar_tipos_vehiculo(
 ):
     datos = ConsultarTiposVehiculo(db).ejecutar(status)
     return responder(200, "Consulta de tipos de vehículo exitosa", datos, funcionalidad="FUN-23")
+
+
+@router.post(
+    "/tipos-vehiculo/{typeId}/factores-consumo",
+    summary="HU-22 Actualizar el factor de consumo de un tipo de vehículo desde una fecha",
+    description="Cierra el factor vigente el día anterior a la nueva fecha y guarda el nuevo factor como vigente. "
+                "Los recorridos ya calculados conservan el factor con que se calcularon. El tipo debe existir y "
+                "estar activo. Requiere el permiso FUN-22 (IC-01).",
+    response_model=RespuestaEstandar, status_code=201,
+    openapi_extra=ruta("FUN-22", ActualizarFactorConsumo.MENSAJE_503),
+    responses={
+        201: ejemplo(201, "Factor de consumo actualizado correctamente", {
+            "typeId": "TV-03", "previousFactor": {"valueLkm": 0.125, "validTo": "2026-12-31"},
+            "newFactor": {"valueLkm": 0.118, "validFrom": "2027-01-01"}}, None, "FUN-22"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-22", "No tiene permiso para actualizar el factor de consumo"),
+        404: ejemplo(404, "Tipo de vehículo no encontrado", None,
+                     [{"field": "typeId", "detail": "No existe un tipo activo con el identificador TV-09"}],
+                     "FUN-22"),
+        422: ejemplo(422, "La fecha del nuevo factor no es válida", None, [
+            {"field": "startDate", "detail": "No puede ser anterior al inicio del factor vigente (2026-11-01)"}],
+            "FUN-22"),
+        503: {"description": ActualizarFactorConsumo.MENSAJE_503},
+    },
+)
+def actualizar_factor_consumo(
+    typeId: str = Path(..., description="Identificador del tipo de vehículo, por ejemplo TV-03"),
+    entrada: FactorConsumoEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-22", "No tiene permiso para actualizar el factor de consumo")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or FactorConsumoEntrada()
+    datos = ActualizarFactorConsumo(db).ejecutar(typeId, entrada.consumptionFactorLkm, entrada.startDate,
+                                                 sesion.documento)
+    return responder(201, "Factor de consumo actualizado correctamente", datos, funcionalidad="FUN-22")
