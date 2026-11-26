@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Path, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
-from app.api.schemas.parametrizacion import SedeEntrada
+from app.api.schemas.parametrizacion import ActualizacionSedeEntrada, SedeEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.repositories.adapters.sede_repositorio_sqlalchemy import SedeRepositorioSQLAlchemy
+from app.services.use_cases.gestion_sedes import ActualizarSede, ConsultarSedes
 from app.services.use_cases.registrar_sede import RegistrarSede
 from app.services.mappers import api
 
@@ -49,3 +50,67 @@ def registrar_sede(
         "address": sede.direccion, "manager": sede.responsable, "status": api.estado(sede.estado),
     }
     return responder(201, "Sede registrada correctamente", datos, funcionalidad="FUN-16")
+
+
+@router.get(
+    "/sedes",
+    summary="HU-19 Consultar el listado de sedes por ciudad o estado",
+    description="Retorna las sedes ordenadas por ciudad y nombre. Los filtros de ciudad y estado son opcionales. "
+                "Requiere el permiso FUN-19 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-19", ConsultarSedes.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de sedes exitosa", [
+            {"siteId": "SED-01", "name": "Bucaramanga", "city": "Bucaramanga",
+             "manager": "Sergio Díaz Mantilla", "status": "active"}], None, "FUN-19"),
+        **SIN_SESION,
+        403: ejemplo(403, "No tiene permiso para consultar las sedes", None,
+                     [{"field": "session", "detail": "El rol no tiene autorizada la operación FUN-19"}], "FUN-19"),
+        404: ejemplo(404, "Sin resultados", None, [{"field": "city", "detail": "No hay sedes registradas en Pasto"}],
+                     "FUN-19"),
+        422: {"description": 'El estado debe ser "active" o "inactive"'},
+        503: {"description": ConsultarSedes.MENSAJE_503},
+    },
+)
+def consultar_sedes(
+    city: str | None = Query(None),
+    status: str | None = Query(None, description='"active" o "inactive"'),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-19", "No tiene permiso para consultar las sedes")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarSedes(db).ejecutar(city, status)
+    return responder(200, "Consulta de sedes exitosa", datos, funcionalidad="FUN-19")
+
+
+@router.patch(
+    "/sedes/{siteId}",
+    summary="HU-17 Actualizar la dirección, ciudad o responsable de una sede",
+    description="Modifica solo los campos enviados de una sede activa (nombre, ciudad, dirección o responsable), "
+                "sin dejarlos vacíos, y registra los valores anteriores con fecha y responsable. "
+                "Requiere el permiso FUN-17 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-17", ActualizarSede.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Sede actualizada correctamente", {
+            "siteId": "SED-02", "name": "Cúcuta", "previousAddress": "Av. 7 # 12-40",
+            "newAddress": "Anillo vial occidental, bodega 14", "manager": "Mauricio Contreras Ibáñez"},
+            None, "FUN-17"),
+        **SIN_SESION,
+        403: {"description": "El rol de la sesión no tiene el permiso FUN-17"},
+        404: ejemplo(404, "Sede no encontrada", None,
+                     [{"field": "siteId", "detail": "No existe una sede activa con el identificador SED-09"}], "FUN-17"),
+        409: ejemplo(409, "Ya existe una sede con ese nombre en la ciudad", None,
+                     [{"field": "name", "detail": "El nombre Bucaramanga ya lo usa otra sede de la ciudad"}], "FUN-17"),
+        422: {"description": "Un campo modificado quedó vacío"},
+        503: {"description": ActualizarSede.MENSAJE_503},
+    },
+)
+def actualizar_sede(
+    siteId: str = Path(..., description="Identificador de la sede, por ejemplo SED-02"),
+    entrada: ActualizacionSedeEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-17", "No tiene permiso para actualizar sedes")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or ActualizacionSedeEntrada()
+    cambios = {"nombre": entrada.name, "ciudad": entrada.city, "direccion": entrada.address,
+               "responsable": entrada.manager}
+    datos = ActualizarSede(db).ejecutar(siteId, cambios, sesion.documento)
+    return responder(200, "Sede actualizada correctamente", datos, funcionalidad="FUN-17")

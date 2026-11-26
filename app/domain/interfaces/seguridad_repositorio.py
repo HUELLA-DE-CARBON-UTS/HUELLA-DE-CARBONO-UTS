@@ -34,3 +34,6 @@ class SesionRepositorio(Protocol):
 
 class BitacoraRepositorio(Protocol):
     def registrar(self, evento: EventoBitacora) -> None: ...
+
+    def consultar(self, desde: datetime, hasta: datetime, usuario: str | None,
+                  tipo_evento: str | None) -> list[EventoBitacora]: ...

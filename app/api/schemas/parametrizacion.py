@@ -17,3 +17,12 @@ class SedeEntrada(BaseModel):
             }]
         }
     }
+
+
+class ActualizacionSedeEntrada(BaseModel):
+    name: str | None = Field(None, description="Nuevo nombre de la sede")
+    city: str | None = Field(None, description="Nueva ciudad")
+    address: str | None = Field(None, description="Nueva dirección")
+    manager: str | None = Field(None, description="Nuevo responsable")
+
+    model_config = {"json_schema_extra": {"examples": [{"address": "Anillo vial occidental, bodega 14"}]}}
