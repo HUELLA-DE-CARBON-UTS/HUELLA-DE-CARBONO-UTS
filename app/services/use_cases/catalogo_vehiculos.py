@@ -1,0 +1,44 @@
+from sqlalchemy.orm import Session
+
+from app.domain.entities.catalogo import ElementoCatalogo, Factor
+from app.domain.exceptions.errores import Conflicto
+from app.repositories.adapters.catalogo_repositorio_sqlalchemy import TIPOS_VEHICULO, CatalogoRepositorioSQLAlchemy
+from app.services.mappers import api
+from app.services.use_cases.transaccion import transaccion
+from app.services.validators import catalogo_validador as v
+
+CAMPO_FACTOR = "consumptionFactorLkm"
+
+
+class RegistrarTipoVehiculo:
+
+    MENSAJE_503 = "No fue posible registrar el tipo de vehículo"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = CatalogoRepositorioSQLAlchemy(db, TIPOS_VEHICULO)
+
+    def ejecutar(self, nombre, descripcion, factor, fecha_inicio, responsable: str) -> dict:
+        nombre, descripcion = v.limpiar(nombre), v.limpiar(descripcion)
+        valor, desde = v.numero(factor), v.fecha(fecha_inicio)
+        v.lanzar([
+            v.error_texto("name", nombre, "El nombre del tipo de vehículo es obligatorio", 60),
+            v.error_texto("description", descripcion, "La descripción es obligatoria", 200),
+            None if valor is not None and valor > 0 else
+            {"field": CAMPO_FACTOR, "detail": "Debe ser numérico, mayor que 0 y expresado en L/km"},
+            v.error_fecha("startDate", desde),
+        ], "Los datos del tipo de vehículo no son válidos", CAMPO_FACTOR, "El factor de consumo no es válido")
+
+        duplicado = Conflicto("El tipo de vehículo ya está registrado", [
+            {"field": "name", "detail": f"Ya existe el tipo {nombre}"}])
+        with transaccion(self.db, self.MENSAJE_503, duplicado):
+            existente = self.repositorio.buscar_por_nombre(nombre)
+            if existente is not None:
+                raise Conflicto("El tipo de vehículo ya está registrado", [
+                    {"field": "name", "detail": f"Ya existe el tipo {existente.nombre}"}])
+            tipo = ElementoCatalogo(id=self.repositorio.siguiente_id(), nombre=nombre, descripcion=descripcion)
+            self.repositorio.guardar(tipo, Factor(valor=valor, vigente_desde=desde, responsable=responsable))
+            self.db.commit()
+
+        return {"typeId": tipo.id, "name": tipo.nombre, "status": api.estado(tipo.estado),
+                "consumptionFactorLkm": valor, "validFrom": desde.isoformat()}

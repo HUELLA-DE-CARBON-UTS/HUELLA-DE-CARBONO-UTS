@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from app.domain.entities.catalogo import ElementoCatalogo, Factor
+
+
+class CatalogoRepositorio(Protocol):
+    def buscar_por_nombre(self, nombre: str) -> ElementoCatalogo | None: ...
+
+    def siguiente_id(self) -> str: ...
+
+    def guardar(self, elemento: ElementoCatalogo, factor: Factor) -> None: ...
+
+    def agregar_factor(self, identificador: str, factor: Factor) -> None: ...
