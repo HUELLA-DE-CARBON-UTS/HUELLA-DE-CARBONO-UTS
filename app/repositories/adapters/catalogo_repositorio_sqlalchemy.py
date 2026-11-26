@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -43,6 +44,10 @@ class CatalogoRepositorioSQLAlchemy:
         modelo = self.sesion.scalar(select(self.c.modelo).where(func.lower(self.c.modelo.nombre) == nombre.lower()))
         return self._elemento(modelo) if modelo else None
 
+    def buscar(self, identificador: str) -> ElementoCatalogo | None:
+        modelo = self.sesion.get(self.c.modelo, identificador)
+        return self._elemento(modelo) if modelo else None
+
     def listar(self, estado: str | None = None) -> list[ElementoCatalogo]:
         consulta = select(self.c.modelo).order_by(getattr(self.c.modelo, self.c.columna_id))
         if estado:
@@ -65,6 +70,16 @@ class CatalogoRepositorioSQLAlchemy:
         consulta = (select(self.c.modelo_factor).where(self._columna_factor() == identificador)
                     .order_by(self.c.modelo_factor.vigente_desde.desc()))
         return [self._factor(m) for m in self.sesion.scalars(consulta)]
+
+    def factor_abierto(self, identificador: str) -> Factor | None:
+        modelo = self.sesion.scalar(select(self.c.modelo_factor).where(
+            self._columna_factor() == identificador, self.c.modelo_factor.vigente_hasta.is_(None)))
+        return self._factor(modelo) if modelo else None
+
+    def cerrar_factor(self, factor: Factor, hasta: date) -> None:
+        modelo = self.sesion.get(self.c.modelo_factor, factor.id)
+        modelo.vigente_hasta = hasta
+        self.sesion.flush()
 
     def agregar_factor(self, identificador: str, factor: Factor) -> None:
         datos = {self.c.columna_id: identificador, "valor": factor.valor, "vigente_desde": factor.vigente_desde,

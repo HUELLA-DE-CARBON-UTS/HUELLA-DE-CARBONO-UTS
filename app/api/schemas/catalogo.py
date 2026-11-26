@@ -15,3 +15,10 @@ class TipoVehiculoEntrada(BaseModel):
         "consumptionFactorLkm": 0.125,
         "startDate": "2026-11-01",
     }]}}
+
+
+class FactorConsumoEntrada(BaseModel):
+    consumptionFactorLkm: Any = Field(None, description="Nuevo factor de consumo en L/km, mayor que 0")
+    startDate: str | None = Field(None, description="Fecha desde la que aplica el nuevo factor (AAAA-MM-DD)")
+
+    model_config = {"json_schema_extra": {"examples": [{"consumptionFactorLkm": 0.118, "startDate": "2027-01-01"}]}}
