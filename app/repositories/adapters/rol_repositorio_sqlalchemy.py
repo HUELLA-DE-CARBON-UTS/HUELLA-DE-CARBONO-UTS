@@ -34,6 +34,14 @@ class RolRepositorioSQLAlchemy:
             consulta = consulta.where(RolModelo.estado == estado)
         return [_a_entidad(m) for m in self.sesion.scalars(consulta)]
 
+    def cambiar_estado(self, id_rol: str, estado: str, responsable: str) -> Rol:
+        modelo = self.sesion.get(RolModelo, id_rol)
+        modelo.estado = estado
+        modelo.fecha_actualizacion = ahora()
+        modelo.responsable = responsable
+        self.sesion.flush()
+        return _a_entidad(modelo)
+
     def operaciones_existentes(self, codigos: list[str]) -> set[str]:
         consulta = select(OperacionModelo.codigo).where(OperacionModelo.codigo.in_(codigos))
         return set(self.sesion.scalars(consulta))
