@@ -1,7 +1,10 @@
 import os
 
-os.environ["TOKEN_ADMIN_INICIAL"] = "token-de-prueba"
+os.environ["DOCUMENTO_ADMIN_INICIAL"] = "1000000000"
+os.environ["CORREO_ADMIN_INICIAL"] = "admin@huella-carbono.local"
+os.environ["CONTRASENA_ADMIN_INICIAL"] = "Clave-Pruebas-2026"
 os.environ["DATABASE_URL"] = "sqlite:///./test_huella.db"
+os.environ["SMTP_HOST"] = ""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,7 +15,7 @@ from app.repositories.database.conexion import Base, crear_motor
 from app.repositories.database.inicializacion import inicializar_base_de_datos
 from main import app
 
-CABECERA_ADMIN = {"Authorization": "Bearer token-de-prueba"}
+ADMIN = {"username": "1000000000", "password": "Clave-Pruebas-2026"}
 
 
 @pytest.fixture()
@@ -38,3 +41,11 @@ def cliente(db):
     app.dependency_overrides[get_db] = _get_db
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def admin(cliente):
+    respuesta = cliente.post("/api/v1/auth/sesiones", json=ADMIN)
+    assert respuesta.status_code == 201, respuesta.text
+    cliente.headers["Authorization"] = "Bearer " + respuesta.headers["X-Token-Sesion"]
+    return cliente
