@@ -126,3 +126,26 @@ class InactivarRol:
             self.db.commit()
 
         return {"roleId": rol.id_rol, "name": rol.nombre, "status": api.estado(rol.estado), "reason": motivo}
+
+
+class ConsultarUsuariosDeRol:
+
+    MENSAJE_503 = "No fue posible consultar los usuarios del rol"
+
+    def __init__(self, db):
+        self.db = db
+
+    def ejecutar(self, id_rol: str) -> list[dict]:
+        id_rol = validar_id_rol(id_rol)
+        with transaccion(self.db, self.MENSAJE_503):
+            if RolRepositorioSQLAlchemy(self.db).buscar_por_id(id_rol) is None:
+                raise NoEncontrado("Rol no encontrado", [
+                    {"field": "roleId", "detail": f"No existe un rol con el identificador {id_rol}"}])
+            documentos = CredencialRepositorioSQLAlchemy(self.db).documentos_con_rol(id_rol)
+            if not documentos:
+                raise NoEncontrado("Sin usuarios asignados", [
+                    {"field": "roleId", "detail": f"El rol {id_rol} no tiene usuarios asignados"}])
+            usuarios = consultar_estado_usuario(self.db, documentos)
+        filas = [{"document": d, "fullName": u["nombres"], "site": u["sede"], "status": api.estado(u["estado"])}
+                 for d, u in usuarios.items()]
+        return sorted(filas, key=lambda f: f["fullName"])
