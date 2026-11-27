@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 
 from app.domain.entities.catalogo import ElementoCatalogo, Factor
-from app.domain.exceptions.errores import Conflicto
+from app.domain.exceptions.errores import Conflicto, DatosNoValidos, NoEncontrado
 from app.repositories.adapters.catalogo_repositorio_sqlalchemy import COMBUSTIBLES, CatalogoRepositorioSQLAlchemy
 from app.services.mappers import api
+from app.services.use_cases.catalogo_comun import factor_del_dia, hoy, plural_estado
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import catalogo_validador as v
 
@@ -48,3 +49,37 @@ class RegistrarCombustible:
 
         return {"idCombustible": combustible.id, "nombre": combustible.nombre, "estado": api.estado(combustible.estado),
                 "factorEmisionKgCO2L": valor, "vigenteDesde": desde.isoformat(), "fuente": fuente}
+
+
+class ConsultarCombustibles:
+
+    MENSAJE_503 = "No fue posible consultar los combustibles"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = CatalogoRepositorioSQLAlchemy(db, COMBUSTIBLES)
+
+    def ejecutar(self, estado: str | None = None) -> list[dict]:
+        estado = v.limpiar(estado).lower() or None
+        if estado and v.error_estado(estado):
+            raise DatosNoValidos("Los criterios de consulta no son válidos", [v.error_estado(estado)])
+        estado = api.estado_interno(estado) if estado else None
+
+        with transaccion(self.db, self.MENSAJE_503):
+            combustibles = self.repositorio.listar(estado)
+            if not combustibles:
+                detalle = f"No hay combustibles {plural_estado(estado)}" if estado else \
+                    "No hay combustibles registrados"
+                raise NoEncontrado("Sin resultados", [{"campo": "estado", "detalle": detalle}])
+            dia = hoy()
+            datos = []
+            for combustible in combustibles:
+                vigente = factor_del_dia(self.repositorio.factores(combustible.id), dia)
+                fila = {"idCombustible": combustible.id, "nombre": combustible.nombre,
+                        "estado": api.estado(combustible.estado),
+                        "factorVigenteKgCO2L": vigente.valor if vigente else None,
+                        "fuente": vigente.fuente if vigente else None}
+                if vigente is None:
+                    fila["sinFactorVigente"] = True
+                datos.append(fila)
+            return datos

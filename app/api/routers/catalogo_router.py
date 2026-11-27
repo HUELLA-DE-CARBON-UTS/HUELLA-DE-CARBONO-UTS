@@ -6,7 +6,7 @@ from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.catalogo import CombustibleEntrada, FactorConsumoEntrada, TipoVehiculoEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.catalogo_combustibles import RegistrarCombustible
+from app.services.use_cases.catalogo_combustibles import ConsultarCombustibles, RegistrarCombustible
 from app.services.use_cases.catalogo_vehiculos import (
     ActualizarFactorConsumo, ConsultarHistoricoConsumo, ConsultarTiposVehiculo, RegistrarTipoVehiculo)
 
@@ -180,3 +180,34 @@ def registrar_combustible(
     datos = RegistrarCombustible(db).ejecutar(entrada.nombre, entrada.descripcion, entrada.factorEmisionKgCO2L,
                                               entrada.fechaInicio, entrada.fuente, sesion.documento)
     return responder(201, "Tipo de combustible registrado correctamente", datos, funcionalidad="FUN-26")
+
+
+@router.get(
+    "/combustibles",
+    summary="HU-28 Consultar los combustibles con su factor de emisión vigente",
+    description="Retorna los combustibles con el factor en kg CO₂/L vigente en la fecha de consulta y su fuente. "
+                "Los combustibles sin factor vigente se señalan con sinFactorVigente = true. El filtro por estado "
+                "es opcional. Requiere el permiso FUN-28 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-28", ConsultarCombustibles.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de combustibles exitosa", [
+            {"idCombustible": "CB-01", "nombre": "Diésel", "estado": "activo", "factorVigenteKgCO2L": 2.6,
+             "fuente": "Fuente oficial (valor ilustrativo)"},
+            {"idCombustible": "CB-02", "nombre": "Gas natural vehicular", "estado": "activo", "factorVigenteKgCO2L": None,
+             "fuente": None, "sinFactorVigente": True}], None, "FUN-28"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-28", "No tiene permiso para consultar el catálogo"),
+        404: ejemplo(404, "Sin resultados", None,
+                     [{"campo": "estado", "detalle": "No hay combustibles inactivos"}], "FUN-28"),
+        422: ejemplo(422, "Los criterios de consulta no son válidos", None,
+                     [{"campo": "estado", "detalle": 'El estado debe ser "activo" o "inactivo"'}], "FUN-28"),
+        503: {"description": ConsultarCombustibles.MENSAJE_503},
+    },
+)
+def consultar_combustibles(
+    estado: str | None = Query(None, description='"activo" o "inactivo"'),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-28", "No tiene permiso para consultar el catálogo")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarCombustibles(db).ejecutar(estado)
+    return responder(200, "Consulta de combustibles exitosa", datos, funcionalidad="FUN-28")
