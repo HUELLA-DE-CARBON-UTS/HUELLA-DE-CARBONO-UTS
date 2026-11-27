@@ -1,16 +1,17 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Path
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.distancias import get_servicio_distancias
 from app.api.dependencies.roles import requiere_permiso
-from app.api.schemas.recorrido import RecorridoEntrada
+from app.api.schemas.recorrido import RecorridoEntrada, ReprogramacionEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.gestion_recorridos import ProgramarRecorrido
+from app.services.use_cases.gestion_recorridos import ProgramarRecorrido, ReprogramarRecorrido
 
 router = APIRouter(prefix="/api/v1/recorridos", tags=["MOD-05 Gestión de Recorridos"])
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
+CODIGO = Path(..., description="Código del recorrido, por ejemplo REC-0152")
 
 
 def _sin_permiso(funcionalidad: str, mensaje: str) -> dict:
@@ -52,3 +53,38 @@ def programar_recorrido(
     datos = ProgramarRecorrido(db, distancias).ejecutar(entrada.placa, entrada.origen, entrada.destino,
                                                         entrada.fechaProgramada, sesion.documento)
     return responder(201, "Recorrido programado correctamente", datos, funcionalidad="FUN-36")
+
+
+@router.patch(
+    "/{codigo}/programacion",
+    summary="HU-37 Cambiar la fecha o el vehículo de un recorrido aún no cerrado",
+    description="Solo se reprograman recorridos «programados». La nueva fecha no puede ser anterior a hoy. Si cambia el "
+                "vehículo, el nuevo debe estar «disponible» (IC-03); el anterior queda «disponible» y el nuevo "
+                "«asignado» (IC-04). El cambio queda en el historial con los valores anteriores, la fecha y el "
+                "responsable. Requiere el permiso FUN-37 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-37", ReprogramarRecorrido.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Recorrido reprogramado correctamente", {
+            "codigoRecorrido": "REC-0152", "placaAnterior": "TTK-482", "placaNueva": "WFN-731",
+            "fechaProgramada": "2026-11-20"}, None, "FUN-37"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-37", "No tiene permiso para reprogramar recorridos"),
+        404: ejemplo(404, "Recorrido no encontrado", None,
+                     [{"campo": "codigoRecorrido", "detalle": "No existe el recorrido REC-9999"}], "FUN-37"),
+        409: ejemplo(409, "El recorrido no se puede reprogramar", None,
+                     [{"campo": "codigoRecorrido", "detalle": "El recorrido REC-0140 ya está cerrado"}], "FUN-37"),
+        422: ejemplo(422, "Los datos de la reprogramación no son válidos", None,
+                     [{"campo": "fechaProgramada", "detalle": "La fecha no puede ser anterior a hoy (RN-05)"}],
+                     "FUN-37"),
+        503: {"description": ReprogramarRecorrido.MENSAJE_503},
+    },
+)
+def reprogramar_recorrido(
+    codigo: str = CODIGO,
+    entrada: ReprogramacionEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-37", "No tiene permiso para reprogramar recorridos")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or ReprogramacionEntrada()
+    datos = ReprogramarRecorrido(db).ejecutar(codigo, entrada.fechaProgramada, entrada.placa, sesion.documento)
+    return responder(200, "Recorrido reprogramado correctamente", datos, funcionalidad="FUN-37")

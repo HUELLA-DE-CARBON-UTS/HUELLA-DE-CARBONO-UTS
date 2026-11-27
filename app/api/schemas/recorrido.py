@@ -9,3 +9,10 @@ class RecorridoEntrada(BaseModel):
 
     model_config = {"json_schema_extra": {"examples": [{
         "placa": "TTK-482", "origen": "Bucaramanga", "destino": "Barranquilla", "fechaProgramada": "2026-12-18"}]}}
+
+
+class ReprogramacionEntrada(BaseModel):
+    fechaProgramada: str | None = Field(None, description="Nueva fecha (AAAA-MM-DD), no anterior a hoy")
+    placa: str | None = Field(None, description="Placa del nuevo vehículo, que debe estar disponible")
+
+    model_config = {"json_schema_extra": {"examples": [{"placa": "WFN-731", "fechaProgramada": "2026-12-20"}]}}

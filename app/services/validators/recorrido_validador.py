@@ -3,6 +3,10 @@ from app.services.validators.vehiculo_validador import FORMATO_PLACA
 FORMATO_FECHA_NO_VALIDO = "Formato de fecha no válido. Debe ser YYYY-MM-DD"
 
 
+def normalizar_codigo(valor) -> str:
+    return limpiar(valor).upper()
+
+
 def error_fecha(campo: str, valor) -> dict | None:
     if not limpiar(valor):
         return {"campo": campo, "detalle": "La fecha es obligatoria"}
