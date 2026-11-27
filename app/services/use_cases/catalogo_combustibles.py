@@ -125,3 +125,23 @@ class ConsultarCombustibles:
                     fila["sinFactorVigente"] = True
                 datos.append(fila)
             return datos
+
+
+class ConsultarHistoricoEmision:
+
+    MENSAJE_503 = "No fue posible consultar el histórico de factores de emisión"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = CatalogoRepositorioSQLAlchemy(db, COMBUSTIBLES)
+
+    def ejecutar(self, id_combustible: str) -> list[dict]:
+        id_combustible = v.validar_identificador(id_combustible, "CB", "idCombustible",
+                                                 "El identificador del combustible no es válido")
+        with transaccion(self.db, self.MENSAJE_503):
+            if self.repositorio.buscar(id_combustible) is None:
+                raise _no_encontrado(id_combustible, False)
+            return [{"valorKgCO2L": f.valor, "vigenteDesde": f.vigente_desde.isoformat(),
+                     "vigenteHasta": f.vigente_hasta.isoformat() if f.vigente_hasta else None,
+                     "fuente": f.fuente, "responsable": f.responsable, "vigente": f.vigente_hasta is None}
+                    for f in self.repositorio.factores(id_combustible)]
