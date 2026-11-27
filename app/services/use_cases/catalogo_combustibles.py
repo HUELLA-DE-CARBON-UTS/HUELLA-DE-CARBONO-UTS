@@ -4,11 +4,17 @@ from app.domain.entities.catalogo import ElementoCatalogo, Factor
 from app.domain.exceptions.errores import Conflicto, DatosNoValidos, NoEncontrado
 from app.repositories.adapters.catalogo_repositorio_sqlalchemy import COMBUSTIBLES, CatalogoRepositorioSQLAlchemy
 from app.services.mappers import api
-from app.services.use_cases.catalogo_comun import factor_del_dia, hoy, plural_estado
+from app.services.use_cases.catalogo_comun import factor_del_dia, hoy, plural_estado, reemplazar_factor
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import catalogo_validador as v
 
 CAMPO_FACTOR = "factorEmisionKgCO2L"
+
+
+def _no_encontrado(identificador: str, activo: bool) -> NoEncontrado:
+    detalle = "un combustible activo" if activo else "un combustible"
+    return NoEncontrado("Combustible no encontrado", [
+        {"campo": "idCombustible", "detalle": f"No existe {detalle} con el identificador {identificador}"}])
 
 
 def _error_fuente(fuente: str) -> dict | None:
@@ -49,6 +55,42 @@ class RegistrarCombustible:
 
         return {"idCombustible": combustible.id, "nombre": combustible.nombre, "estado": api.estado(combustible.estado),
                 "factorEmisionKgCO2L": valor, "vigenteDesde": desde.isoformat(), "fuente": fuente}
+
+
+class ActualizarFactorEmision:
+
+    MENSAJE_503 = "No fue posible actualizar el factor de emisión"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = CatalogoRepositorioSQLAlchemy(db, COMBUSTIBLES)
+
+    def ejecutar(self, id_combustible: str, factor, fecha_inicio, fuente, responsable: str) -> dict:
+        id_combustible = (id_combustible or "").strip().upper()
+        fuente = v.limpiar(fuente)
+        valor, desde = v.numero(factor), v.fecha(fecha_inicio)
+        error_factor = None
+        if valor is None:
+            error_factor = {"campo": CAMPO_FACTOR, "detalle": "Debe ser numérico y mayor que 0"}
+        elif valor <= 0:
+            error_factor = {"campo": CAMPO_FACTOR, "detalle": "Debe ser mayor que 0"}
+        v.lanzar([error_factor, v.error_fecha("fechaInicio", desde), _error_fuente(fuente)],
+                 "Los datos del nuevo factor no son válidos", CAMPO_FACTOR, "El factor de emisión no es válido")
+
+        with transaccion(self.db, self.MENSAJE_503):
+            combustible = self.repositorio.buscar(id_combustible)
+            if combustible is None or combustible.estado != "activo":
+                raise _no_encontrado(id_combustible, True)
+            nuevo = Factor(valor=valor, vigente_desde=desde, responsable=responsable, fuente=fuente)
+            anterior = reemplazar_factor(self.repositorio, id_combustible, nuevo)
+            self.db.commit()
+
+        return {
+            "idCombustible": id_combustible,
+            "factorAnterior": {"valorKgCO2L": anterior.valor, "vigenteHasta": anterior.vigente_hasta.isoformat()}
+            if anterior else None,
+            "factorNuevo": {"valorKgCO2L": valor, "vigenteDesde": desde.isoformat(), "fuente": fuente},
+        }
 
 
 class ConsultarCombustibles:

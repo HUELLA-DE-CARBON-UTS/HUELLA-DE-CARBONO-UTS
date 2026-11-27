@@ -4,9 +4,10 @@ from sqlalchemy.orm import Session
 from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
-from app.api.schemas.catalogo import CombustibleEntrada, FactorConsumoEntrada, TipoVehiculoEntrada
+from app.api.schemas.catalogo import CombustibleEntrada, FactorConsumoEntrada, FactorEmisionEntrada, TipoVehiculoEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.catalogo_combustibles import ConsultarCombustibles, RegistrarCombustible
+from app.services.use_cases.catalogo_combustibles import (
+    ActualizarFactorEmision, ConsultarCombustibles, RegistrarCombustible)
 from app.services.use_cases.catalogo_vehiculos import (
     ActualizarFactorConsumo, ConsultarHistoricoConsumo, ConsultarTiposVehiculo, RegistrarTipoVehiculo)
 
@@ -211,3 +212,38 @@ def consultar_combustibles(
 ):
     datos = ConsultarCombustibles(db).ejecutar(estado)
     return responder(200, "Consulta de combustibles exitosa", datos, funcionalidad="FUN-28")
+
+
+@router.post(
+    "/combustibles/{idCombustible}/factores-emision",
+    summary="HU-27 Actualizar el factor de emisión de un combustible desde una fecha",
+    description="Cierra el factor vigente el día anterior a la nueva fecha y guarda el nuevo factor como vigente "
+                "con su fuente. Los recorridos ya calculados conservan el factor con que se calcularon. El "
+                "combustible debe existir y estar activo. Requiere el permiso FUN-27 (IC-01).",
+    response_model=RespuestaEstandar, status_code=201,
+    openapi_extra=ruta("FUN-27", ActualizarFactorEmision.MENSAJE_503),
+    responses={
+        201: ejemplo(201, "Factor de emisión actualizado correctamente", {
+            "idCombustible": "CB-01", "factorAnterior": {"valorKgCO2L": 2.6, "vigenteHasta": "2026-12-31"},
+            "factorNuevo": {"valorKgCO2L": 2.63, "vigenteDesde": "2027-01-01", "fuente": FUENTE}}, None, "FUN-27"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-27", "No tiene permiso para actualizar el factor de emisión"),
+        404: ejemplo(404, "Combustible no encontrado", None,
+                     [{"campo": "idCombustible", "detalle": "No existe un combustible activo con el identificador CB-09"}],
+                     "FUN-27"),
+        422: ejemplo(422, "La fecha del nuevo factor no es válida", None, [
+            {"campo": "fechaInicio", "detalle": "No puede ser anterior al inicio del factor vigente (2026-11-01)"}],
+            "FUN-27"),
+        503: {"description": ActualizarFactorEmision.MENSAJE_503},
+    },
+)
+def actualizar_factor_emision(
+    idCombustible: str = Path(..., description="Identificador del combustible, por ejemplo CB-01"),
+    entrada: FactorEmisionEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-27", "No tiene permiso para actualizar el factor de emisión")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or FactorEmisionEntrada()
+    datos = ActualizarFactorEmision(db).ejecutar(idCombustible, entrada.factorEmisionKgCO2L, entrada.fechaInicio,
+                                                 entrada.fuente, sesion.documento)
+    return responder(201, "Factor de emisión actualizado correctamente", datos, funcionalidad="FUN-27")
