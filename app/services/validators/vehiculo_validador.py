@@ -5,6 +5,7 @@ from app.services.validators.catalogo_validador import limpiar, numero
 FORMATO_PLACA = re.compile(r"^[A-Z]{3}-\d{3}$")
 ESTADOS = {"disponible": "disponible", "asignado": "asignado", "fuera_de_servicio": "fuera de servicio"}
 ESTADOS_INTERNOS = {v: k for k, v in ESTADOS.items()}
+ESTADOS_MANUALES = ("disponible", "fuera de servicio")
 
 
 def normalizar_placa(valor) -> str:
@@ -41,4 +42,10 @@ def estado_api(valor: str) -> str:
 def error_estado_busqueda(valor: str) -> dict | None:
     if valor not in ESTADOS_INTERNOS:
         return {"campo": "estado", "detalle": 'El estado debe ser "disponible", "asignado" o "fuera de servicio"'}
+    return None
+
+
+def error_estado_manual(valor: str) -> dict | None:
+    if valor not in ESTADOS_MANUALES:
+        return {"campo": "estado", "detalle": 'El estado debe ser "disponible" o "fuera de servicio"'}
     return None

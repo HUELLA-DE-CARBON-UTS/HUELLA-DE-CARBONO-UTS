@@ -26,3 +26,10 @@ class FichaTecnicaEntrada(BaseModel):
     aplicaDesde: str | None = Field(None, description="Fecha desde la que aplica el cambio (AAAA-MM-DD)")
 
     model_config = {"json_schema_extra": {"examples": [{"combustible": "Gas natural vehicular", "aplicaDesde": "2026-11-10"}]}}
+
+
+class EstadoSedeVehiculoEntrada(BaseModel):
+    estado: str | None = Field(None, description='"disponible" o "fuera de servicio"')
+    sede: str | None = Field(None, description="Nombre o identificador (SED-XX) de la nueva sede")
+
+    model_config = {"json_schema_extra": {"examples": [{"estado": "fuera de servicio"}]}}
