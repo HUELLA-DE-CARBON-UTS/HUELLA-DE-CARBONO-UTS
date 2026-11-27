@@ -1,7 +1,10 @@
+from datetime import timedelta
+
 from sqlalchemy.orm import Session
 
 from app.domain.entities.vehiculo import FichaTecnica, Vehiculo
 from app.domain.exceptions.errores import Conflicto, DatosNoValidos, NoEncontrado, SolicitudIncorrecta
+from app.repositories.adapters.historial_repositorio_sqlalchemy import HistorialRepositorioSQLAlchemy
 from app.repositories.adapters.vehiculo_repositorio_sqlalchemy import VehiculoRepositorioSQLAlchemy
 from app.services.contratos.ic02_consultar_catalogo_vigente import (
     consultar_catalogo_vigente, error_de_catalogo, nombre_en_catalogo, solo_falta_factor)
@@ -9,13 +12,32 @@ from app.services.contratos.ic11_consultar_sede import consultar_sede, error_de_
 from app.services.use_cases.catalogo_comun import hoy
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import vehiculo_validador as v
-from app.services.validators.catalogo_validador import limpiar
+from app.services.validators.catalogo_validador import fecha, limpiar
+
+
+def _no_encontrado(placa: str) -> NoEncontrado:
+    return NoEncontrado("Vehículo no encontrado", [
+        {"campo": "placa", "detalle": f"No existe un vehículo con la placa {placa}"}])
+
+
+def _asignado(placa: str) -> Conflicto:
+    return Conflicto("El vehículo está asignado a un recorrido abierto", [
+        {"campo": "placa", "detalle": f"El vehículo {placa} está asignado a un recorrido abierto"}])
 
 
 def _ficha_vigente(repositorio: VehiculoRepositorioSQLAlchemy, placa: str) -> FichaTecnica | None:
     fichas = repositorio.fichas(placa)
     dia = hoy()
     return next((f for f in fichas if f.aplica_en(dia)), fichas[-1] if fichas else None)
+
+
+def _buscar_disponible_para_cambios(repositorio: VehiculoRepositorioSQLAlchemy, placa: str) -> Vehiculo:
+    vehiculo = repositorio.buscar(placa)
+    if vehiculo is None:
+        raise _no_encontrado(placa)
+    if vehiculo.estado == "asignado":
+        raise _asignado(placa)
+    return vehiculo
 
 
 class RegistrarVehiculo:
@@ -114,3 +136,84 @@ class ConsultarVehiculos:
             return [{"placa": vehiculo.placa, "tipo": nombre_tipo, "combustible": nombre_combustible,
                      "sede": sedes.get(vehiculo.id_sede, vehiculo.id_sede), "estado": v.estado_api(vehiculo.estado)}
                     for vehiculo, nombre_tipo, nombre_combustible in resultado]
+
+
+class ActualizarFichaTecnica:
+
+    MENSAJE_503 = "No fue posible actualizar la ficha técnica"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = VehiculoRepositorioSQLAlchemy(db)
+        self.historial = HistorialRepositorioSQLAlchemy(db)
+
+    def ejecutar(self, placa, tipo, combustible, capacidad, aplica_desde, responsable: str) -> dict:
+        placa, tipo, combustible = v.normalizar_placa(placa), limpiar(tipo), limpiar(combustible)
+        desde = fecha(aplica_desde)
+        errores = []
+        if not tipo and not combustible and capacidad is None:
+            errores.append({"campo": "datos", "detalle": "Debe indicar el tipo de vehículo, el combustible o la capacidad"})
+        if capacidad is not None:
+            errores.append(v.error_capacidad(capacidad))
+        if desde is None:
+            errores.append({"campo": "aplicaDesde",
+                            "detalle": "La fecha desde la que aplica es obligatoria y debe tener el formato AAAA-MM-DD"})
+        errores = [e for e in errores if e]
+        if errores:
+            raise DatosNoValidos("Los datos de la ficha técnica no son válidos", errores)
+
+        with transaccion(self.db, self.MENSAJE_503):
+            _buscar_disponible_para_cambios(self.repositorio, placa)
+            actual = self.repositorio.ficha_abierta(placa)
+
+            errores, nuevos = [], {}
+            for catalogo, referencia, campo in (("tipo", tipo, "tipoVehiculo"), ("combustible", combustible, "combustible")):
+                if referencia:
+                    info = consultar_catalogo_vigente(self.db, catalogo, referencia)
+                    error = error_de_catalogo(info, catalogo, referencia, campo)
+                    if error:
+                        errores.append(error)
+                    else:
+                        nuevos[catalogo] = info
+            if errores:
+                raise DatosNoValidos("El nuevo tipo o combustible no es válido", errores)
+
+            nueva = FichaTecnica(
+                id_tipo=nuevos["tipo"]["id"] if "tipo" in nuevos else actual.id_tipo,
+                id_combustible=nuevos["combustible"]["id"] if "combustible" in nuevos else actual.id_combustible,
+                capacidad_t=v.capacidad(capacidad) if capacidad is not None else actual.capacidad_t,
+                vigente_desde=desde, responsable=responsable, id=actual.id)
+
+            cambios = []
+            if nueva.id_tipo != actual.id_tipo:
+                cambios.append({"campo": "tipoVehiculo", "valorAnterior": nombre_en_catalogo(self.db, "tipo", actual.id_tipo),
+                                "valorNuevo": nuevos["tipo"]["nombre"]})
+            if nueva.id_combustible != actual.id_combustible:
+                cambios.append({"campo": "combustible",
+                                "valorAnterior": nombre_en_catalogo(self.db, "combustible", actual.id_combustible),
+                                "valorNuevo": nuevos["combustible"]["nombre"]})
+            if nueva.capacidad_t != actual.capacidad_t:
+                cambios.append({"campo": "capacidadT", "valorAnterior": actual.capacidad_t,
+                                "valorNuevo": nueva.capacidad_t})
+            if not cambios:
+                raise DatosNoValidos("No hay cambios en la ficha técnica", [
+                    {"campo": "datos", "detalle": "Los valores enviados son iguales a los de la ficha vigente"}])
+
+            inicio = actual.vigente_desde
+            if desde < inicio:
+                raise DatosNoValidos("La fecha desde la que aplica no es válida", [
+                    {"campo": "aplicaDesde",
+                     "detalle": f"No puede ser anterior al inicio de la ficha vigente ({inicio.isoformat()})"}])
+            if desde == inicio:
+                self.repositorio.reemplazar_ficha(nueva)
+            else:
+                self.repositorio.cerrar_ficha(actual, desde - timedelta(days=1))
+                self.repositorio.agregar_ficha(placa, nueva)
+
+            for cambio in cambios:
+                self.historial.registrar("vehiculo", placa, f"ficha_tecnica_{cambio['campo']}",
+                                         str(cambio["valorAnterior"]), str(cambio["valorNuevo"]), responsable,
+                                         f"Aplica desde {desde.isoformat()}")
+            self.db.commit()
+
+        return {"placa": placa, "cambios": cambios, "aplicaDesde": desde.isoformat()}

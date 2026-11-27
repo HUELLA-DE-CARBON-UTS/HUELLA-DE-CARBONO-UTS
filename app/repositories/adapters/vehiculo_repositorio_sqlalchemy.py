@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -37,6 +39,24 @@ class VehiculoRepositorioSQLAlchemy:
         consulta = (select(FichaTecnicaModelo).where(FichaTecnicaModelo.placa == placa)
                     .order_by(FichaTecnicaModelo.vigente_desde.desc()))
         return [_ficha(m) for m in self.sesion.scalars(consulta)]
+
+    def ficha_abierta(self, placa: str) -> FichaTecnica | None:
+        modelo = self.sesion.scalar(select(FichaTecnicaModelo).where(
+            FichaTecnicaModelo.placa == placa, FichaTecnicaModelo.vigente_hasta.is_(None)))
+        return _ficha(modelo) if modelo else None
+
+    def cerrar_ficha(self, ficha: FichaTecnica, hasta: date) -> None:
+        self.sesion.get(FichaTecnicaModelo, ficha.id).vigente_hasta = hasta
+        self.sesion.flush()
+
+    def reemplazar_ficha(self, ficha: FichaTecnica) -> None:
+        modelo = self.sesion.get(FichaTecnicaModelo, ficha.id)
+        modelo.id_tipo = ficha.id_tipo
+        modelo.id_combustible = ficha.id_combustible
+        modelo.capacidad_t = ficha.capacidad_t
+        modelo.responsable = ficha.responsable
+        modelo.fecha_registro = ahora()
+        self.sesion.flush()
 
     def agregar_ficha(self, placa: str, ficha: FichaTecnica) -> None:
         self.sesion.add(FichaTecnicaModelo(placa=placa, id_tipo=ficha.id_tipo, id_combustible=ficha.id_combustible,
