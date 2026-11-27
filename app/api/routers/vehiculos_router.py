@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/v1/vehiculos", tags=["MOD-04 Gestión de Flota"]
 
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
 PLACA = Path(..., description="Placa del vehículo, por ejemplo TTK-482")
-ASIGNADO = [{"campo": "placa", "detalle": "El vehículo SXR-215 está asignado a un recorrido abierto"}]
+ASIGNADO = [{"campo": "placa", "detalle": "El vehículo SXR-215 está asignado al recorrido REC-0160"}]
 
 
 def _sin_permiso(funcionalidad: str, mensaje: str) -> dict:

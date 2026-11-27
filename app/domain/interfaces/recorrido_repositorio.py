@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from app.domain.entities.recorrido import Recorrido
+
+
+class RecorridoRepositorio(Protocol):
+    def siguiente_codigo(self) -> str: ...
+
+    def guardar(self, recorrido: Recorrido, responsable: str) -> None: ...
+
+    def buscar(self, codigo: str) -> Recorrido | None: ...
+
+    def abierto_de(self, placa: str) -> str | None: ...
