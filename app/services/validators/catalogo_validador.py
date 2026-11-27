@@ -1,9 +1,10 @@
 import re
 from datetime import date
 
-from app.domain.exceptions.errores import DatosNoValidos
+from app.domain.exceptions.errores import DatosNoValidos, SolicitudIncorrecta
 
 ESTADOS = ("active", "inactive")
+FORMATO_ID = {"TV": re.compile(r"^TV-\d{2,}$"), "CB": re.compile(r"^CB-\d{2,}$")}
 FORMATO_FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -53,3 +54,10 @@ def lanzar(errores: list[dict | None], mensaje_general: str, campo_factor: str, 
     if all(e["field"] == campo_factor for e in errores):
         raise DatosNoValidos(mensaje_factor, errores)
     raise DatosNoValidos(mensaje_general, errores)
+
+
+def validar_identificador(valor: str, prefijo: str, campo: str, mensaje: str) -> str:
+    identificador = (valor or "").strip().upper()
+    if not FORMATO_ID[prefijo].match(identificador):
+        raise SolicitudIncorrecta(mensaje, [{"field": campo, "detail": f"Debe tener el formato {prefijo}-XX"}])
+    return identificador
