@@ -7,7 +7,7 @@ from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.catalogo import FactorConsumoEntrada, TipoVehiculoEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.services.use_cases.catalogo_vehiculos import (
-    ActualizarFactorConsumo, ConsultarTiposVehiculo, RegistrarTipoVehiculo)
+    ActualizarFactorConsumo, ConsultarHistoricoConsumo, ConsultarTiposVehiculo, RegistrarTipoVehiculo)
 
 router = APIRouter(prefix="/api/v1/catalogos", tags=["MOD-03 Parametrización"])
 
@@ -115,3 +115,33 @@ def actualizar_factor_consumo(
     datos = ActualizarFactorConsumo(db).ejecutar(typeId, entrada.consumptionFactorLkm, entrada.startDate,
                                                  sesion.documento)
     return responder(201, "Factor de consumo actualizado correctamente", datos, funcionalidad="FUN-22")
+
+
+@router.get(
+    "/tipos-vehiculo/{typeId}/factores-consumo",
+    summary="HU-24 Consultar el histórico de factores de consumo de un tipo de vehículo",
+    description="Retorna todos los factores del tipo con sus fechas de inicio y fin y su responsable, del más "
+                "reciente al más antiguo, señalando el vigente con current = true. Requiere el permiso FUN-24 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-24", ConsultarHistoricoConsumo.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta del histórico de factores exitosa", [
+            {"valueLkm": 0.118, "validFrom": "2027-01-01", "validTo": None, "registeredBy": "63456789",
+             "current": True},
+            {"valueLkm": 0.125, "validFrom": "2026-11-01", "validTo": "2026-12-31", "registeredBy": "63456789",
+             "current": False}], None, "FUN-24"),
+        400: ejemplo(400, "El identificador del tipo de vehículo no es válido", None,
+                     [{"field": "typeId", "detail": "Debe tener el formato TV-XX"}], "FUN-24"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-24", "No tiene permiso para consultar el histórico"),
+        404: ejemplo(404, "Tipo de vehículo no encontrado", None,
+                     [{"field": "typeId", "detail": "No existe un tipo con el identificador TV-09"}], "FUN-24"),
+        503: {"description": ConsultarHistoricoConsumo.MENSAJE_503},
+    },
+)
+def consultar_historico_consumo(
+    typeId: str = Path(..., description="Identificador del tipo de vehículo, por ejemplo TV-03"),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-24", "No tiene permiso para consultar el histórico")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarHistoricoConsumo(db).ejecutar(typeId)
+    return responder(200, "Consulta del histórico de factores exitosa", datos, funcionalidad="FUN-24")

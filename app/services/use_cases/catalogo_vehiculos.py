@@ -116,3 +116,23 @@ class ConsultarTiposVehiculo:
                     fila["noCurrentFactor"] = True
                 datos.append(fila)
             return datos
+
+
+class ConsultarHistoricoConsumo:
+
+    MENSAJE_503 = "No fue posible consultar el histórico de factores de consumo"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = CatalogoRepositorioSQLAlchemy(db, TIPOS_VEHICULO)
+
+    def ejecutar(self, id_tipo: str) -> list[dict]:
+        id_tipo = v.validar_identificador(id_tipo, "TV", "typeId",
+                                          "El identificador del tipo de vehículo no es válido")
+        with transaccion(self.db, self.MENSAJE_503):
+            if self.repositorio.buscar(id_tipo) is None:
+                raise _no_encontrado(id_tipo, False)
+            return [{"valueLkm": f.valor, "validFrom": f.vigente_desde.isoformat(),
+                     "validTo": f.vigente_hasta.isoformat() if f.vigente_hasta else None,
+                     "registeredBy": f.responsable, "current": f.vigente_hasta is None}
+                    for f in self.repositorio.factores(id_tipo)]
