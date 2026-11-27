@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.entities.vehiculo import FichaTecnica, Vehiculo
@@ -28,6 +29,14 @@ class VehiculoRepositorioSQLAlchemy:
                                        fecha_registro=ahora(), responsable=ficha.responsable))
         self.sesion.flush()
         self.agregar_ficha(vehiculo.placa, ficha)
+
+    def listar(self) -> list[Vehiculo]:
+        return [_vehiculo(m) for m in self.sesion.scalars(select(VehiculoModelo).order_by(VehiculoModelo.placa))]
+
+    def fichas(self, placa: str) -> list[FichaTecnica]:
+        consulta = (select(FichaTecnicaModelo).where(FichaTecnicaModelo.placa == placa)
+                    .order_by(FichaTecnicaModelo.vigente_desde.desc()))
+        return [_ficha(m) for m in self.sesion.scalars(consulta)]
 
     def agregar_ficha(self, placa: str, ficha: FichaTecnica) -> None:
         self.sesion.add(FichaTecnicaModelo(placa=placa, id_tipo=ficha.id_tipo, id_combustible=ficha.id_combustible,

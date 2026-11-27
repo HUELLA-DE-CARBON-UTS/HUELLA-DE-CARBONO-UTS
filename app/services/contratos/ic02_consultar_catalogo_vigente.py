@@ -25,6 +25,11 @@ def consultar_catalogo_vigente(db: Session, catalogo: str, referencia: str, dia:
             "factor": factor.valor if factor else None}
 
 
+def nombre_en_catalogo(db: Session, catalogo: str, identificador: str) -> str:
+    elemento = CatalogoRepositorioSQLAlchemy(db, CATALOGOS[catalogo][0]).buscar(identificador)
+    return elemento.nombre if elemento else identificador
+
+
 def error_de_catalogo(info: dict, catalogo: str, referencia: str, campo: str) -> dict | None:
     etiqueta = "el tipo de vehículo" if catalogo == "tipo" else "el combustible"
     if not info["existe"]:

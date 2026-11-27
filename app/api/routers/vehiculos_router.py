@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario
@@ -6,7 +6,7 @@ from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.api.schemas.vehiculo import VehiculoEntrada
-from app.services.use_cases.flota_vehiculos import RegistrarVehiculo
+from app.services.use_cases.flota_vehiculos import ConsultarVehiculos, RegistrarVehiculo
 
 router = APIRouter(prefix="/api/v1/vehiculos", tags=["MOD-04 Gestión de Flota"])
 
@@ -49,3 +49,39 @@ def registrar_vehiculo(
     datos = RegistrarVehiculo(db).ejecutar(entrada.placa, entrada.tipoVehiculo, entrada.combustible, entrada.capacidadT,
                                            entrada.sede, sesion.documento)
     return responder(201, "Vehículo registrado correctamente", datos, funcionalidad="FUN-31")
+
+
+@router.get(
+    "",
+    summary="HU-34 Buscar vehículos por placa, tipo, sede o estado",
+    description="Aplica al mismo tiempo todos los criterios enviados (se exige al menos uno) y retorna placa, tipo, "
+                "combustible, sede y estado de cada vehículo. Requiere el permiso FUN-34 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-34", ConsultarVehiculos.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de vehículos exitosa", [
+            {"placa": "TTK-482", "tipo": "Tractocamión", "combustible": "Diésel", "sede": "Bucaramanga",
+             "estado": "disponible"},
+            {"placa": "WFN-731", "tipo": "Tractocamión", "combustible": "Diésel", "sede": "Bucaramanga",
+             "estado": "disponible"}], None, "FUN-34"),
+        400: ejemplo(400, "Debe indicar al menos un criterio de búsqueda", None,
+                     [{"campo": "criterios", "detalle": "No se recibió placa, tipo, sede ni estado"}], "FUN-34"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-34", "No tiene permiso para consultar los vehículos"),
+        404: ejemplo(404, "Sin resultados", None,
+                     [{"campo": "criterios", "detalle": "No hay vehículos que cumplan los criterios"}], "FUN-34"),
+        422: ejemplo(422, "Los criterios de búsqueda no son válidos", None, [
+            {"campo": "estado", "detalle": 'El estado debe ser "disponible", "asignado" o "fuera de servicio"'}],
+            "FUN-34"),
+        503: {"description": ConsultarVehiculos.MENSAJE_503},
+    },
+)
+def consultar_vehiculos(
+    placa: str | None = Query(None, description="Placa completa o parte de ella"),
+    tipo: str | None = Query(None, description="Nombre o identificador (TV-XX) del tipo de vehículo"),
+    sede: str | None = Query(None, description="Nombre o identificador (SED-XX) de la sede"),
+    estado: str | None = Query(None, description='"disponible", "asignado" o "fuera de servicio"'),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-34", "No tiene permiso para consultar los vehículos")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarVehiculos(db).ejecutar(placa, tipo, sede, estado)
+    return responder(200, "Consulta de vehículos exitosa", datos, funcionalidad="FUN-34")
