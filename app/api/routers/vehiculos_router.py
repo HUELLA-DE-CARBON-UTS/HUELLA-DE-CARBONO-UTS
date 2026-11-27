@@ -5,8 +5,9 @@ from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.api.schemas.vehiculo import FichaTecnicaEntrada, VehiculoEntrada
-from app.services.use_cases.flota_vehiculos import ActualizarFichaTecnica, ConsultarVehiculos, RegistrarVehiculo
+from app.api.schemas.vehiculo import EstadoSedeVehiculoEntrada, FichaTecnicaEntrada, VehiculoEntrada
+from app.services.use_cases.flota_vehiculos import (
+    ActualizarEstadoSedeVehiculo, ActualizarFichaTecnica, ConsultarVehiculos, RegistrarVehiculo)
 
 router = APIRouter(prefix="/api/v1/vehiculos", tags=["MOD-04 Gestión de Flota"])
 
@@ -124,3 +125,37 @@ def actualizar_ficha_tecnica(
     datos = ActualizarFichaTecnica(db).ejecutar(placa, entrada.tipoVehiculo, entrada.combustible, entrada.capacidadT,
                                                 entrada.aplicaDesde, sesion.documento)
     return responder(200, "Ficha técnica actualizada correctamente", datos, funcionalidad="FUN-32")
+
+
+@router.patch(
+    "/{placa}/estado-sede",
+    summary="HU-33 Cambiar el estado o la sede de un vehículo no asignado",
+    description="Cambia el estado entre «disponible» y «fuera de servicio» y/o traslada el vehículo a otra sede activa "
+                "y distinta de la actual (IC-11). El vehículo no puede estar asignado a un recorrido abierto (RN-04). "
+                "El historial guarda valor anterior, valor nuevo, fecha y responsable. Requiere el permiso FUN-33 "
+                "(IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-33", ActualizarEstadoSedeVehiculo.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Vehículo actualizado correctamente", {
+            "placa": "TTK-482", "estadoAnterior": "disponible", "estadoNuevo": "fuera de servicio",
+            "sedeAnterior": "Bucaramanga", "sedeNueva": "Bucaramanga"}, None, "FUN-33"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-33", "No tiene permiso para actualizar el vehículo"),
+        404: ejemplo(404, "Vehículo no encontrado", None,
+                     [{"campo": "placa", "detalle": "No existe un vehículo con la placa TTK-999"}], "FUN-33"),
+        409: ejemplo(409, "El vehículo está asignado a un recorrido abierto", None, ASIGNADO, "FUN-33"),
+        422: ejemplo(422, "La sede de destino no es válida", None, [
+            {"campo": "sede", "detalle": "La sede de destino debe estar activa y ser distinta de la actual"}],
+            "FUN-33"),
+        503: {"description": ActualizarEstadoSedeVehiculo.MENSAJE_503},
+    },
+)
+def actualizar_estado_sede_vehiculo(
+    placa: str = PLACA,
+    entrada: EstadoSedeVehiculoEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-33", "No tiene permiso para actualizar el vehículo")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or EstadoSedeVehiculoEntrada()
+    datos = ActualizarEstadoSedeVehiculo(db).ejecutar(placa, entrada.estado, entrada.sede, sesion.documento)
+    return responder(200, "Vehículo actualizado correctamente", datos, funcionalidad="FUN-33")

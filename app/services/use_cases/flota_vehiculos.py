@@ -217,3 +217,52 @@ class ActualizarFichaTecnica:
             self.db.commit()
 
         return {"placa": placa, "cambios": cambios, "aplicaDesde": desde.isoformat()}
+
+
+class ActualizarEstadoSedeVehiculo:
+
+    MENSAJE_503 = "No fue posible actualizar el vehículo"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = VehiculoRepositorioSQLAlchemy(db)
+        self.historial = HistorialRepositorioSQLAlchemy(db)
+
+    def ejecutar(self, placa, estado, sede, responsable: str) -> dict:
+        placa, estado, sede = v.normalizar_placa(placa), limpiar(estado).lower(), limpiar(sede)
+        if not estado and not sede:
+            raise DatosNoValidos("Los datos del vehículo no son válidos", [
+                {"campo": "datos", "detalle": "Debe indicar el nuevo estado o la nueva sede"}])
+        if estado and v.error_estado_manual(estado):
+            raise DatosNoValidos("Los datos del vehículo no son válidos", [v.error_estado_manual(estado)])
+
+        with transaccion(self.db, self.MENSAJE_503):
+            vehiculo = _buscar_disponible_para_cambios(self.repositorio, placa)
+            estado_anterior, sede_anterior = vehiculo.estado, vehiculo.id_sede
+
+            if sede:
+                info = consultar_sede(self.db, sede)
+                error = error_de_sede(info, sede, "sede")
+                if error and (not info["existe"] or info.get("ambigua")):
+                    raise DatosNoValidos("La sede de destino no es válida", [error])
+                if error or info["idSede"] == vehiculo.id_sede:
+                    raise DatosNoValidos("La sede de destino no es válida", [
+                        {"campo": "sede", "detalle": "La sede de destino debe estar activa y ser distinta de la actual"}])
+                vehiculo.id_sede = info["idSede"]
+            if estado:
+                vehiculo.estado = v.ESTADOS_INTERNOS[estado]
+            if vehiculo.estado == estado_anterior and vehiculo.id_sede == sede_anterior:
+                raise DatosNoValidos("No hay cambios para aplicar", [
+                    {"campo": "estado", "detalle": f"El vehículo ya se encuentra en estado {estado}"}])
+
+            self.repositorio.actualizar(vehiculo)
+            if vehiculo.estado != estado_anterior:
+                self.historial.registrar("vehiculo", placa, "estado", estado_anterior, vehiculo.estado, responsable)
+            if vehiculo.id_sede != sede_anterior:
+                self.historial.registrar("vehiculo", placa, "sede", sede_anterior, vehiculo.id_sede, responsable)
+            self.db.commit()
+
+        sedes = nombres_de_sedes(self.db, [sede_anterior, vehiculo.id_sede])
+        return {"placa": placa, "estadoAnterior": v.estado_api(estado_anterior),
+                "estadoNuevo": v.estado_api(vehiculo.estado), "sedeAnterior": sedes.get(sede_anterior, sede_anterior),
+                "sedeNueva": sedes.get(vehiculo.id_sede, vehiculo.id_sede)}

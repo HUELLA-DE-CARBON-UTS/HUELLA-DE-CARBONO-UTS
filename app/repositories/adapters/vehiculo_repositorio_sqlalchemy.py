@@ -64,3 +64,9 @@ class VehiculoRepositorioSQLAlchemy:
                                            vigente_hasta=None, responsable=ficha.responsable,
                                            fecha_registro=ahora()))
         self.sesion.flush()
+
+    def actualizar(self, vehiculo: Vehiculo) -> None:
+        modelo = self.sesion.get(VehiculoModelo, vehiculo.placa)
+        modelo.id_sede = vehiculo.id_sede
+        modelo.estado = vehiculo.estado
+        self.sesion.flush()
