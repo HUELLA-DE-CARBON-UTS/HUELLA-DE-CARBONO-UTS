@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.entities.vehiculo import FichaTecnica, Vehiculo
 from app.domain.exceptions.errores import Conflicto, DatosNoValidos, NoEncontrado, SolicitudIncorrecta
+from app.repositories.adapters.recorrido_repositorio_sqlalchemy import RecorridoRepositorioSQLAlchemy
 from app.repositories.adapters.historial_repositorio_sqlalchemy import HistorialRepositorioSQLAlchemy
 from app.repositories.adapters.vehiculo_repositorio_sqlalchemy import VehiculoRepositorioSQLAlchemy
 from app.services.contratos.ic02_consultar_catalogo_vigente import (
@@ -20,9 +21,11 @@ def _no_encontrado(placa: str) -> NoEncontrado:
         {"campo": "placa", "detalle": f"No existe un vehículo con la placa {placa}"}])
 
 
-def _asignado(placa: str) -> Conflicto:
-    return Conflicto("El vehículo está asignado a un recorrido abierto", [
-        {"campo": "placa", "detalle": f"El vehículo {placa} está asignado a un recorrido abierto"}])
+def _asignado(repositorio: VehiculoRepositorioSQLAlchemy, placa: str) -> Conflicto:
+    codigo = RecorridoRepositorioSQLAlchemy(repositorio.sesion).abierto_de(placa)
+    detalle = f"El vehículo {placa} está asignado al recorrido {codigo}" if codigo else \
+        f"El vehículo {placa} está asignado a un recorrido abierto"
+    return Conflicto("El vehículo está asignado a un recorrido abierto", [{"campo": "placa", "detalle": detalle}])
 
 
 def _ficha_vigente(repositorio: VehiculoRepositorioSQLAlchemy, placa: str) -> FichaTecnica | None:
@@ -36,7 +39,7 @@ def _buscar_disponible_para_cambios(repositorio: VehiculoRepositorioSQLAlchemy, 
     if vehiculo is None:
         raise _no_encontrado(placa)
     if vehiculo.estado == "asignado":
-        raise _asignado(placa)
+        raise _asignado(repositorio, placa)
     return vehiculo
 
 
