@@ -4,14 +4,16 @@ from sqlalchemy.orm import Session
 from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.roles import requiere_permiso
-from app.api.schemas.catalogo import FactorConsumoEntrada, TipoVehiculoEntrada
+from app.api.schemas.catalogo import CombustibleEntrada, FactorConsumoEntrada, TipoVehiculoEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
+from app.services.use_cases.catalogo_combustibles import RegistrarCombustible
 from app.services.use_cases.catalogo_vehiculos import (
     ActualizarFactorConsumo, ConsultarHistoricoConsumo, ConsultarTiposVehiculo, RegistrarTipoVehiculo)
 
 router = APIRouter(prefix="/api/v1/catalogos", tags=["MOD-03 Parametrización"])
 
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
+FUENTE = "Fuente oficial consultada por API-EXT-03 (valor ilustrativo)"
 
 
 def _sin_permiso(funcionalidad: str, mensaje: str) -> dict:
@@ -145,3 +147,36 @@ def consultar_historico_consumo(
 ):
     datos = ConsultarHistoricoConsumo(db).ejecutar(typeId)
     return responder(200, "Consulta del histórico de factores exitosa", datos, funcionalidad="FUN-24")
+
+
+@router.post(
+    "/combustibles",
+    summary="HU-26 Registrar un tipo de combustible con su factor de emisión y fuente oficial",
+    description="Registra el combustible en estado «active» y guarda su factor en kg CO₂/L como vigente desde la "
+                "fecha indicada, junto con la fuente oficial. El valor que propone API-EXT-03 solo se guarda cuando "
+                "el administrador lo confirma y lo envía; si API-EXT-03 no responde, el administrador puede digitar "
+                "el factor manualmente. Requiere el permiso FUN-26 (IC-01).",
+    response_model=RespuestaEstandar, status_code=201,
+    openapi_extra=ruta("FUN-26", RegistrarCombustible.MENSAJE_503),
+    responses={
+        201: ejemplo(201, "Tipo de combustible registrado correctamente", {
+            "fuelId": "CB-01", "name": "Diésel", "status": "active", "emissionFactorKgCO2L": 2.6,
+            "validFrom": "2026-11-01", "source": FUENTE}, None, "FUN-26"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-26", "No tiene permiso para registrar combustibles"),
+        409: ejemplo(409, "El combustible ya está registrado", None,
+                     [{"field": "name", "detail": "Ya existe el combustible Diésel"}], "FUN-26"),
+        422: ejemplo(422, "El factor de emisión no es válido", None,
+                     [{"field": "emissionFactorKgCO2L", "detail": "Debe ser numérico y mayor que 0"}], "FUN-26"),
+        503: {"description": RegistrarCombustible.MENSAJE_503},
+    },
+)
+def registrar_combustible(
+    entrada: CombustibleEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-26", "No tiene permiso para registrar combustibles")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or CombustibleEntrada()
+    datos = RegistrarCombustible(db).ejecutar(entrada.name, entrada.description, entrada.emissionFactorKgCO2L,
+                                              entrada.startDate, entrada.source, sesion.documento)
+    return responder(201, "Tipo de combustible registrado correctamente", datos, funcionalidad="FUN-26")
