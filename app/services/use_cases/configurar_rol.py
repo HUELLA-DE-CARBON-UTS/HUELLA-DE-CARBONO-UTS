@@ -42,7 +42,7 @@ class ConfigurarRol:
         except SQLAlchemyError as exc:
             raise ServicioNoDisponible(
                 "No fue posible guardar la configuración del rol",
-                [{"field": "database", "detail": "La base de datos no está disponible"}],
+                [{"campo": "baseDeDatos", "detalle": "La base de datos no está disponible"}],
             ) from exc
 
         guardado.permisos = permisos

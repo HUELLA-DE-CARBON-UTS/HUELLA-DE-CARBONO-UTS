@@ -2,7 +2,7 @@ from app.domain.exceptions.errores import DatosNoValidos
 
 MENSAJE = "Los datos de la sede no son válidos"
 
-CAMPOS_API = {"nombre": "name", "ciudad": "city", "direccion": "address", "responsable": "manager"}
+CAMPOS_API = {"nombre": "nombre", "ciudad": "ciudad", "direccion": "direccion", "responsable": "responsable"}
 
 CAMPOS = {
     "nombre": ("El nombre de la sede es obligatorio", 80),
@@ -21,8 +21,8 @@ def validar_obligatorios(datos: dict[str, str]) -> None:
     for campo, (mensaje_vacio, maximo) in CAMPOS.items():
         valor = datos.get(campo, "")
         if not valor:
-            errores.append({"field": CAMPOS_API[campo], "detail": mensaje_vacio})
+            errores.append({"campo": CAMPOS_API[campo], "detalle": mensaje_vacio})
         elif len(valor) > maximo:
-            errores.append({"field": CAMPOS_API[campo], "detail": f"El campo no puede superar {maximo} caracteres"})
+            errores.append({"campo": CAMPOS_API[campo], "detalle": f"El campo no puede superar {maximo} caracteres"})
     if errores:
         raise DatosNoValidos(MENSAJE, errores)

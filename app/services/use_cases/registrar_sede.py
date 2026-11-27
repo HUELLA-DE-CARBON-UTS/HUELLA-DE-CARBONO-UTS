@@ -9,7 +9,7 @@ from app.services.validators import sede_validador
 
 def _sede_duplicada(nombre: str, ciudad: str) -> Conflicto:
     return Conflicto("Ya existe una sede con ese nombre en la ciudad", [
-        {"field": "name", "detail": f"La sede {nombre} ya está registrada en {ciudad}"},
+        {"campo": "nombre", "detalle": f"La sede {nombre} ya está registrada en {ciudad}"},
     ])
 
 
@@ -41,5 +41,5 @@ class RegistrarSede:
         except SQLAlchemyError as exc:
             raise ServicioNoDisponible(
                 "No fue posible registrar la sede",
-                [{"field": "database", "detail": "La base de datos no está disponible"}],
+                [{"campo": "baseDeDatos", "detalle": "La base de datos no está disponible"}],
             ) from exc

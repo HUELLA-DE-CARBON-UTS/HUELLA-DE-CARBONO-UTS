@@ -19,7 +19,7 @@ class ConsultarUsuarios:
         estado = v.limpiar(estado).lower()
         if not any([documento, nombre, sede, estado]):
             raise SolicitudIncorrecta("Debe indicar al menos un criterio de búsqueda", [
-                {"field": "criteria", "detail": "No se recibió document, name, site ni status"}])
+                {"campo": "criterios", "detalle": "No se recibió documento, nombre, sede ni estado"}])
         if estado and v.error_estado(estado):
             raise DatosNoValidos("Los criterios de búsqueda no son válidos", [v.error_estado(estado)])
         estado = api.estado_interno(estado) if estado else ""
@@ -29,9 +29,9 @@ class ConsultarUsuarios:
             encontrados = self.usuarios.buscar(documento or None, nombre or None, id_sedes, estado or None)
             if not encontrados:
                 raise NoEncontrado("Sin resultados", [
-                    {"field": "criteria", "detail": "No hay usuarios que cumplan todos los criterios"}])
+                    {"campo": "criterios", "detalle": "No hay usuarios que cumplan todos los criterios"}])
             roles = consultar_rol_usuario(self.db, [u.documento for u in encontrados])
             sedes = nombres_de_sedes(self.db, [u.id_sede for u in encontrados])
 
-        return [{"document": u.documento, "fullName": u.nombres, "role": roles.get(u.documento),
-                 "site": sedes.get(u.id_sede), "status": api.estado(u.estado)} for u in encontrados]
+        return [{"documento": u.documento, "nombres": u.nombres, "rol": roles.get(u.documento),
+                 "sede": sedes.get(u.id_sede), "estado": api.estado(u.estado)} for u in encontrados]

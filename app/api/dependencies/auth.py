@@ -12,7 +12,7 @@ from app.repositories.adapters.seguridad_repositorio_sqlalchemy import SesionRep
 esquema_bearer = HTTPBearer(auto_error=False, description="Token recibido en la cabecera X-Token-Sesion al iniciar sesión")
 
 SIN_SESION = SesionNoValida("No hay una sesión vigente", [
-    {"field": "session", "detail": "Debe iniciar sesión para realizar esta operación"},
+    {"campo": "sesion", "detalle": "Debe iniciar sesión para realizar esta operación"},
 ])
 
 

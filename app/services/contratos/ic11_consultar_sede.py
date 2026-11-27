@@ -45,9 +45,9 @@ def ids_de_sede(db: Session, referencia: str) -> list[str]:
 
 def error_de_sede(info: dict, referencia: str, campo: str) -> dict | None:
     if not info["existe"]:
-        return {"field": campo, "detail": f"La sede {referencia} no existe"}
+        return {"campo": campo, "detalle": f"La sede {referencia} no existe"}
     if info.get("ambigua"):
-        return {"field": campo, "detail": f"Hay varias sedes llamadas {referencia}; indique su identificador (SED-XX)"}
+        return {"campo": campo, "detalle": f"Hay varias sedes llamadas {referencia}; indique su identificador (SED-XX)"}
     if info["estado"] != "activa":
-        return {"field": campo, "detail": f"La sede {info['nombre']} se encuentra inactiva"}
+        return {"campo": campo, "detalle": f"La sede {info['nombre']} se encuentra inactiva"}
     return None

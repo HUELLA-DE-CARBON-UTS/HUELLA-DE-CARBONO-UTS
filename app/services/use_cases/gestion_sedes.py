@@ -7,7 +7,7 @@ from app.services.mappers import api
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import sede_validador
 
-ESTADOS_SEDE = ("active", "inactive")
+ESTADOS_SEDE = ("activa", "inactiva")
 
 
 def _orden(texto: str) -> str:
@@ -27,14 +27,14 @@ class ActualizarSede:
         enviados = {campo: sede_validador.limpiar(valor) for campo, valor in cambios.items() if valor is not None}
         if not enviados:
             raise DatosNoValidos("Los datos de la sede no son válidos", [
-                {"field": "data", "detail": "Debe indicar al menos un dato para modificar"}])
+                {"campo": "datos", "detalle": "Debe indicar al menos un dato para modificar"}])
         errores = []
         for campo, valor in enviados.items():
             maximo = sede_validador.CAMPOS[campo][1]
             if not valor:
-                errores.append({"field": sede_validador.CAMPOS_API[campo], "detail": "El campo modificado no puede quedar vacío"})
+                errores.append({"campo": sede_validador.CAMPOS_API[campo], "detalle": "El campo modificado no puede quedar vacío"})
             elif len(valor) > maximo:
-                errores.append({"field": sede_validador.CAMPOS_API[campo], "detail": f"El campo no puede superar {maximo} caracteres"})
+                errores.append({"campo": sede_validador.CAMPOS_API[campo], "detalle": f"El campo no puede superar {maximo} caracteres"})
         if errores:
             raise DatosNoValidos("Los datos de la sede no son válidos", errores)
 
@@ -42,12 +42,12 @@ class ActualizarSede:
             sede = self.sedes.buscar_por_id(id_sede)
             if sede is None or sede.estado != "activa":
                 raise NoEncontrado("Sede no encontrada", [
-                    {"field": "siteId", "detail": f"No existe una sede activa con el identificador {id_sede}"}])
+                    {"campo": "idSede", "detalle": f"No existe una sede activa con el identificador {id_sede}"}])
             nombre = enviados.get("nombre", sede.nombre)
             ciudad = enviados.get("ciudad", sede.ciudad)
             if ("nombre" in enviados or "ciudad" in enviados) and self.sedes.existe_en_ciudad(nombre, ciudad, id_sede):
                 raise Conflicto("Ya existe una sede con ese nombre en la ciudad", [
-                    {"field": "name", "detail": f"El nombre {nombre} ya lo usa otra sede de la ciudad"}])
+                    {"campo": "nombre", "detalle": f"El nombre {nombre} ya lo usa otra sede de la ciudad"}])
 
             direccion_anterior = sede.direccion
             historial = HistorialRepositorioSQLAlchemy(self.db)
@@ -59,8 +59,8 @@ class ActualizarSede:
             sede = self.sedes.actualizar(sede)
             self.db.commit()
 
-        return {"siteId": sede.id_sede, "name": sede.nombre, "previousAddress": direccion_anterior,
-                "newAddress": sede.direccion, "manager": sede.responsable}
+        return {"idSede": sede.id_sede, "nombre": sede.nombre, "direccionAnterior": direccion_anterior,
+                "direccionNueva": sede.direccion, "responsable": sede.responsable}
 
 
 class ConsultarSedes:
@@ -75,7 +75,7 @@ class ConsultarSedes:
         estado = sede_validador.limpiar(estado).lower() or None
         if estado and estado not in ESTADOS_SEDE:
             raise DatosNoValidos("Los criterios de consulta no son válidos", [
-                {"field": "status", "detail": 'El estado debe ser "active" o "inactive"'}])
+                {"campo": "estado", "detalle": 'El estado debe ser "activa" o "inactiva"'}])
         estado = api.estado_interno(estado, femenino=True) if estado else None
 
         with transaccion(self.db, self.MENSAJE_503):
@@ -83,9 +83,9 @@ class ConsultarSedes:
         if not sedes:
             if ciudad:
                 detalle = f"No hay sedes registradas en {ciudad}" + (f" en estado {estado}" if estado else "")
-                raise NoEncontrado("Sin resultados", [{"field": "city", "detail": detalle}])
+                raise NoEncontrado("Sin resultados", [{"campo": "ciudad", "detalle": detalle}])
             detalle = f"No hay sedes en estado {estado}" if estado else "No hay sedes registradas"
-            raise NoEncontrado("Sin resultados", [{"field": "status", "detail": detalle}])
+            raise NoEncontrado("Sin resultados", [{"campo": "estado", "detalle": detalle}])
         sedes = sorted(sedes, key=lambda s: (_orden(s.ciudad), _orden(s.nombre)))
-        return [{"siteId": s.id_sede, "name": s.nombre, "city": s.ciudad, "manager": s.responsable,
-                 "status": api.estado(s.estado)} for s in sedes]
+        return [{"idSede": s.id_sede, "nombre": s.nombre, "ciudad": s.ciudad, "responsable": s.responsable,
+                 "estado": api.estado(s.estado)} for s in sedes]

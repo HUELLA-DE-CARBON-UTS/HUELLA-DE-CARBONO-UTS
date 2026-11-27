@@ -19,9 +19,9 @@ def verificar_permiso(db: Session, id_sesion: str, operacion: str) -> dict:
     operacion = (operacion or "").strip().upper()
     errores = []
     if not id_sesion:
-        errores.append({"field": "sessionId", "detail": "La sesión es obligatoria"})
+        errores.append({"campo": "idSesion", "detalle": "La sesión es obligatoria"})
     if not operacion:
-        errores.append({"field": "operation", "detail": "La operación solicitada es obligatoria"})
+        errores.append({"campo": "operacion", "detalle": "La operación solicitada es obligatoria"})
     if errores:
         return cuerpo_estandar(422, "Los datos de la verificación no son válidos", None, errores, FUN)
 
@@ -54,18 +54,18 @@ def verificar_permiso(db: Session, id_sesion: str, operacion: str) -> dict:
                 fecha=ahora(), id_sesion=id_sesion))
             db.commit()
             return cuerpo_estandar(403, "Operación no autorizada", None,
-                                   [{"field": "operation", "detail": detalle}], FUN)
+                                   [{"campo": "operacion", "detalle": detalle}], FUN)
 
         sesiones.registrar_actividad(id_sesion)
         db.commit()
         return cuerpo_estandar(200, "Operación autorizada", {
-            "sessionId": id_sesion, "operation": operacion, "role": nombre_rol, "authorized": True,
+            "idSesion": id_sesion, "operacion": operacion, "rol": nombre_rol, "autorizado": True,
         }, [], FUN)
     except SQLAlchemyError:
         db.rollback()
         return cuerpo_estandar(503, "No fue posible verificar el permiso de la operación", None,
-                               [{"field": "database", "detail": "La base de datos no está disponible"}], FUN)
+                               [{"campo": "baseDeDatos", "detalle": "La base de datos no está disponible"}], FUN)
 
 
 def _sesion_no_valida(id_sesion: str, detalle: str) -> dict:
-    return cuerpo_estandar(401, "Sesión no válida", None, [{"field": "sessionId", "detail": detalle}], FUN)
+    return cuerpo_estandar(401, "Sesión no válida", None, [{"campo": "idSesion", "detalle": detalle}], FUN)

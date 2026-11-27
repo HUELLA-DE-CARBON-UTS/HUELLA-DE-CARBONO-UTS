@@ -8,13 +8,13 @@ from app.services.use_cases.catalogo_comun import factor_del_dia, hoy, plural_es
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import catalogo_validador as v
 
-CAMPO_FACTOR = "consumptionFactorLkm"
+CAMPO_FACTOR = "factorConsumoLkm"
 
 
 def _no_encontrado(identificador: str, activo: bool) -> NoEncontrado:
     detalle = "un tipo activo" if activo else "un tipo"
     return NoEncontrado("Tipo de vehículo no encontrado", [
-        {"field": "typeId", "detail": f"No existe {detalle} con el identificador {identificador}"}])
+        {"campo": "idTipo", "detalle": f"No existe {detalle} con el identificador {identificador}"}])
 
 
 class RegistrarTipoVehiculo:
@@ -29,26 +29,26 @@ class RegistrarTipoVehiculo:
         nombre, descripcion = v.limpiar(nombre), v.limpiar(descripcion)
         valor, desde = v.numero(factor), v.fecha(fecha_inicio)
         v.lanzar([
-            v.error_texto("name", nombre, "El nombre del tipo de vehículo es obligatorio", 60),
-            v.error_texto("description", descripcion, "La descripción es obligatoria", 200),
+            v.error_texto("nombre", nombre, "El nombre del tipo de vehículo es obligatorio", 60),
+            v.error_texto("descripcion", descripcion, "La descripción es obligatoria", 200),
             None if valor is not None and valor > 0 else
-            {"field": CAMPO_FACTOR, "detail": "Debe ser numérico, mayor que 0 y expresado en L/km"},
-            v.error_fecha("startDate", desde),
+            {"campo": CAMPO_FACTOR, "detalle": "Debe ser numérico, mayor que 0 y expresado en L/km"},
+            v.error_fecha("fechaInicio", desde),
         ], "Los datos del tipo de vehículo no son válidos", CAMPO_FACTOR, "El factor de consumo no es válido")
 
         duplicado = Conflicto("El tipo de vehículo ya está registrado", [
-            {"field": "name", "detail": f"Ya existe el tipo {nombre}"}])
+            {"campo": "nombre", "detalle": f"Ya existe el tipo {nombre}"}])
         with transaccion(self.db, self.MENSAJE_503, duplicado):
             existente = self.repositorio.buscar_por_nombre(nombre)
             if existente is not None:
                 raise Conflicto("El tipo de vehículo ya está registrado", [
-                    {"field": "name", "detail": f"Ya existe el tipo {existente.nombre}"}])
+                    {"campo": "nombre", "detalle": f"Ya existe el tipo {existente.nombre}"}])
             tipo = ElementoCatalogo(id=self.repositorio.siguiente_id(), nombre=nombre, descripcion=descripcion)
             self.repositorio.guardar(tipo, Factor(valor=valor, vigente_desde=desde, responsable=responsable))
             self.db.commit()
 
-        return {"typeId": tipo.id, "name": tipo.nombre, "status": api.estado(tipo.estado),
-                "consumptionFactorLkm": valor, "validFrom": desde.isoformat()}
+        return {"idTipo": tipo.id, "nombre": tipo.nombre, "estado": api.estado(tipo.estado),
+                "factorConsumoLkm": valor, "vigenteDesde": desde.isoformat()}
 
 
 class ActualizarFactorConsumo:
@@ -64,10 +64,10 @@ class ActualizarFactorConsumo:
         valor, desde = v.numero(factor), v.fecha(fecha_inicio)
         error_factor = None
         if valor is None:
-            error_factor = {"field": CAMPO_FACTOR, "detail": "Debe ser numérico y mayor que 0"}
+            error_factor = {"campo": CAMPO_FACTOR, "detalle": "Debe ser numérico y mayor que 0"}
         elif valor <= 0:
-            error_factor = {"field": CAMPO_FACTOR, "detail": "Debe ser mayor que 0"}
-        v.lanzar([error_factor, v.error_fecha("startDate", desde)],
+            error_factor = {"campo": CAMPO_FACTOR, "detalle": "Debe ser mayor que 0"}
+        v.lanzar([error_factor, v.error_fecha("fechaInicio", desde)],
                  "Los datos del nuevo factor no son válidos", CAMPO_FACTOR, "El factor de consumo no es válido")
 
         with transaccion(self.db, self.MENSAJE_503):
@@ -79,10 +79,10 @@ class ActualizarFactorConsumo:
             self.db.commit()
 
         return {
-            "typeId": id_tipo,
-            "previousFactor": {"valueLkm": anterior.valor, "validTo": anterior.vigente_hasta.isoformat()}
+            "idTipo": id_tipo,
+            "factorAnterior": {"valorLkm": anterior.valor, "vigenteHasta": anterior.vigente_hasta.isoformat()}
             if anterior else None,
-            "newFactor": {"valueLkm": valor, "validFrom": desde.isoformat()},
+            "factorNuevo": {"valorLkm": valor, "vigenteDesde": desde.isoformat()},
         }
 
 
@@ -105,15 +105,15 @@ class ConsultarTiposVehiculo:
             if not tipos:
                 detalle = f"No hay tipos de vehículo {plural_estado(estado)}" if estado else \
                     "No hay tipos de vehículo registrados"
-                raise NoEncontrado("Sin resultados", [{"field": "status", "detail": detalle}])
+                raise NoEncontrado("Sin resultados", [{"campo": "estado", "detalle": detalle}])
             dia = hoy()
             datos = []
             for tipo in tipos:
                 vigente = factor_del_dia(self.repositorio.factores(tipo.id), dia)
-                fila = {"typeId": tipo.id, "name": tipo.nombre, "status": api.estado(tipo.estado),
-                        "currentFactorLkm": vigente.valor if vigente else None}
+                fila = {"idTipo": tipo.id, "nombre": tipo.nombre, "estado": api.estado(tipo.estado),
+                        "factorVigenteLkm": vigente.valor if vigente else None}
                 if vigente is None:
-                    fila["noCurrentFactor"] = True
+                    fila["sinFactorVigente"] = True
                 datos.append(fila)
             return datos
 
@@ -127,12 +127,12 @@ class ConsultarHistoricoConsumo:
         self.repositorio = CatalogoRepositorioSQLAlchemy(db, TIPOS_VEHICULO)
 
     def ejecutar(self, id_tipo: str) -> list[dict]:
-        id_tipo = v.validar_identificador(id_tipo, "TV", "typeId",
+        id_tipo = v.validar_identificador(id_tipo, "TV", "idTipo",
                                           "El identificador del tipo de vehículo no es válido")
         with transaccion(self.db, self.MENSAJE_503):
             if self.repositorio.buscar(id_tipo) is None:
                 raise _no_encontrado(id_tipo, False)
-            return [{"valueLkm": f.valor, "validFrom": f.vigente_desde.isoformat(),
-                     "validTo": f.vigente_hasta.isoformat() if f.vigente_hasta else None,
-                     "registeredBy": f.responsable, "current": f.vigente_hasta is None}
+            return [{"valorLkm": f.valor, "vigenteDesde": f.vigente_desde.isoformat(),
+                     "vigenteHasta": f.vigente_hasta.isoformat() if f.vigente_hasta else None,
+                     "responsable": f.responsable, "vigente": f.vigente_hasta is None}
                     for f in self.repositorio.factores(id_tipo)]

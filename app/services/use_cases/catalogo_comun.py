@@ -16,10 +16,10 @@ def reemplazar_factor(repositorio: CatalogoRepositorio, identificador: str, nuev
         inicio = anterior.vigente_desde.isoformat()
         if nuevo.vigente_desde < anterior.vigente_desde:
             raise DatosNoValidos("La fecha del nuevo factor no es válida", [
-                {"field": "startDate", "detail": f"No puede ser anterior al inicio del factor vigente ({inicio})"}])
+                {"campo": "fechaInicio", "detalle": f"No puede ser anterior al inicio del factor vigente ({inicio})"}])
         if nuevo.vigente_desde == anterior.vigente_desde:
             raise DatosNoValidos("La fecha del nuevo factor no es válida", [
-                {"field": "startDate", "detail": f"Debe ser posterior al inicio del factor vigente ({inicio})"}])
+                {"campo": "fechaInicio", "detalle": f"Debe ser posterior al inicio del factor vigente ({inicio})"}])
         anterior.vigente_hasta = nuevo.vigente_desde - timedelta(days=1)
         repositorio.cerrar_factor(anterior, anterior.vigente_hasta)
     repositorio.agregar_factor(identificador, nuevo)

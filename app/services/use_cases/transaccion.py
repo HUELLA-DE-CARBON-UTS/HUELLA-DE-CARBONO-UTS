@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.exceptions.errores import ErrorNegocio, ServicioNoDisponible
 
-ERROR_BD = [{"field": "database", "detail": "La base de datos no está disponible"}]
+ERROR_BD = [{"campo": "baseDeDatos", "detalle": "La base de datos no está disponible"}]
 
 
 @contextmanager

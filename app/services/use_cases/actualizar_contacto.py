@@ -18,7 +18,7 @@ class ActualizarContacto:
         documento = documento.strip()
         if correo is None and telefono is None:
             raise DatosNoValidos("Los datos de contacto no son válidos", [
-                {"field": "email", "detail": "Debe indicar el correo o el teléfono nuevos"}])
+                {"campo": "correo", "detalle": "Debe indicar el correo o el teléfono nuevos"}])
         correo = v.limpiar(correo).lower() if correo is not None else None
         telefono = "".join(telefono.split()) if telefono is not None else None
         errores = []
@@ -29,17 +29,17 @@ class ActualizarContacto:
         if errores:
             raise DatosNoValidos("Los datos de contacto no son válidos", errores)
 
-        conflicto = Conflicto(CORREO_OCUPADO, [{"field": "email", "detail": f"El correo {correo} ya está registrado"}])
+        conflicto = Conflicto(CORREO_OCUPADO, [{"campo": "correo", "detalle": f"El correo {correo} ya está registrado"}])
         with transaccion(self.db, MENSAJE_503, conflicto):
             usuario = self.usuarios.buscar_por_documento(documento)
             if usuario is None or usuario.estado != "activo":
                 raise NoEncontrado("Usuario no encontrado", [
-                    {"field": "document", "detail": f"No existe un usuario activo con el documento {documento}"}])
+                    {"campo": "documento", "detalle": f"No existe un usuario activo con el documento {documento}"}])
             if correo is not None:
                 otro = self.usuarios.buscar_por_correo(correo)
                 if otro and otro.documento != documento:
                     raise Conflicto(CORREO_OCUPADO, [
-                        {"field": "email", "detail": f"El correo {correo} está asignado al usuario {otro.documento}"}])
+                        {"campo": "correo", "detalle": f"El correo {correo} está asignado al usuario {otro.documento}"}])
 
             correo_anterior, telefono_anterior = usuario.correo, usuario.telefono
             if correo is not None and correo != correo_anterior:
@@ -51,5 +51,5 @@ class ActualizarContacto:
             self.usuarios.actualizar(usuario)
             self.db.commit()
 
-        return {"document": documento, "previousEmail": correo_anterior, "newEmail": usuario.correo,
-                "phone": usuario.telefono}
+        return {"documento": documento, "correoAnterior": correo_anterior, "correoNuevo": usuario.correo,
+                "telefono": usuario.telefono}

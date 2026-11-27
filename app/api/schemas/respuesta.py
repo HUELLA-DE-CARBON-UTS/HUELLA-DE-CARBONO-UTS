@@ -8,23 +8,23 @@ from starlette.routing import Match
 from app.services.contratos.resultado import cuerpo_estandar
 
 
-class ErrorItem(BaseModel):
-    field: str
-    detail: str
+class ErrorCampo(BaseModel):
+    campo: str
+    detalle: str
 
 
-class Metadata(BaseModel):
-    feature: str | None = None
-    timestamp: str
+class Metadatos(BaseModel):
+    funcionalidad: str | None = None
+    fecha: str
 
 
 class RespuestaEstandar(BaseModel):
     success: bool
-    status: int
+    codigo: int
     message: str
     data: Any = None
-    errors: list[ErrorItem] = []
-    metadata: Metadata
+    errores: list[ErrorCampo] = []
+    metadatos: Metadatos
 
 
 def responder(codigo: int, mensaje: str, datos: Any = None, errores: list[dict] | None = None,
@@ -39,9 +39,9 @@ def ruta(funcionalidad: str, mensaje_503: str) -> dict:
 
 def ejemplo(codigo: int, mensaje: str, datos: Any, errores: list[dict] | None, funcionalidad: str) -> dict:
     return {"content": {"application/json": {"example": {
-        "success": codigo < 400, "status": codigo, "message": mensaje,
-        "data": datos, "errors": errores or [],
-        "metadata": {"feature": funcionalidad, "timestamp": "2026-11-03T09:15:00-05:00"},
+        "success": codigo < 400, "codigo": codigo, "message": mensaje,
+        "data": datos, "errores": errores or [],
+        "metadatos": {"funcionalidad": funcionalidad, "fecha": "2026-11-03T09:15:00-05:00"},
     }}}}
 
 

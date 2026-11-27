@@ -17,7 +17,7 @@ def validar_id_rol(id_rol: str) -> str:
     id_rol = id_rol.strip().upper()
     if not FORMATO_ID_ROL.match(id_rol):
         raise SolicitudIncorrecta("El identificador del rol no es válido", [
-            {"field": "roleId", "detail": "Debe tener el formato ROL-XX"}])
+            {"campo": "idRol", "detalle": "Debe tener el formato ROL-XX"}])
     return id_rol
 
 
@@ -41,32 +41,32 @@ class CambiarRolUsuario:
         documento, rol = documento.strip(), v.limpiar(rol)
         if not rol:
             raise DatosNoValidos("Los datos del cambio de rol no son válidos", [
-                {"field": "role", "detail": "El nuevo rol es obligatorio"}])
+                {"campo": "rol", "detalle": "El nuevo rol es obligatorio"}])
 
         with transaccion(self.db, self.MENSAJE_503):
             info = consultar_estado_usuario(self.db, [documento]).get(documento)
             credencial = self.credenciales.buscar(documento)
             if info is None or info["estado"] != "activo" or credencial is None:
                 raise NoEncontrado("Usuario no encontrado", [
-                    {"field": "document", "detail": f"No existe un usuario activo con el documento {documento}"}])
+                    {"campo": "documento", "detalle": f"No existe un usuario activo con el documento {documento}"}])
             nuevo = consultar_rol(self.db, rol)
             if nuevo is None:
                 raise DatosNoValidos("El rol indicado no está disponible", [
-                    {"field": "role", "detail": f"El rol {rol} no existe"}])
+                    {"campo": "rol", "detalle": f"El rol {rol} no existe"}])
             if nuevo.estado != "activo":
                 raise DatosNoValidos("El rol indicado no está disponible", [
-                    {"field": "role", "detail": f"El rol {nuevo.nombre} se encuentra inactivo"}])
+                    {"campo": "rol", "detalle": f"El rol {nuevo.nombre} se encuentra inactivo"}])
             if credencial.id_rol == nuevo.id_rol:
                 raise Conflicto("El usuario ya tiene asignado ese rol", [
-                    {"field": "role", "detail": f"El usuario {documento} ya tiene el rol {nuevo.nombre}"}])
+                    {"campo": "rol", "detalle": f"El usuario {documento} ya tiene el rol {nuevo.nombre}"}])
 
             self.credenciales.cambiar_rol(documento, nuevo.id_rol)
             HistorialRepositorioSQLAlchemy(self.db).registrar(
                 "usuario", documento, "rol", credencial.nombre_rol, nuevo.nombre, responsable)
             self.db.commit()
 
-        return {"document": documento, "previousRole": credencial.nombre_rol, "newRole": nuevo.nombre,
-                "appliesFrom": "next_operation"}
+        return {"documento": documento, "rolAnterior": credencial.nombre_rol, "rolNuevo": nuevo.nombre,
+                "aplicaDesde": "siguiente operación"}
 
 
 class ConsultarRoles:
@@ -86,9 +86,9 @@ class ConsultarRoles:
             roles = RolRepositorioSQLAlchemy(self.db).listar(estado)
             if not roles:
                 detalle = f"No hay roles en estado {estado}" if estado else "No hay roles registrados"
-                raise NoEncontrado("Sin resultados", [{"field": "status", "detail": detalle}])
-            return [{"roleId": r.id_rol, "name": r.nombre, "status": api.estado(r.estado), "permissions": r.permisos,
-                     "activeUsers": contar_usuarios_activos(self.db, r.id_rol)} for r in roles]
+                raise NoEncontrado("Sin resultados", [{"campo": "estado", "detalle": detalle}])
+            return [{"idRol": r.id_rol, "nombre": r.nombre, "estado": api.estado(r.estado), "permisos": r.permisos,
+                     "usuariosActivos": contar_usuarios_activos(self.db, r.id_rol)} for r in roles]
 
 
 class InactivarRol:
@@ -104,28 +104,28 @@ class InactivarRol:
         motivo = v.limpiar(motivo)
         if not motivo:
             raise DatosNoValidos("Los datos de la inactivación no son válidos", [
-                {"field": "reason", "detail": "El motivo es obligatorio"}])
+                {"campo": "motivo", "detalle": "El motivo es obligatorio"}])
         if len(motivo) > 300:
             raise DatosNoValidos("Los datos de la inactivación no son válidos", [
-                {"field": "reason", "detail": "El motivo no puede superar 300 caracteres"}])
+                {"campo": "motivo", "detalle": "El motivo no puede superar 300 caracteres"}])
 
         with transaccion(self.db, self.MENSAJE_503):
             rol = self.roles.buscar_por_id(id_rol)
             if rol is None or rol.estado != "activo":
                 raise NoEncontrado("Rol no encontrado", [
-                    {"field": "roleId", "detail": f"No existe un rol activo con el identificador {id_rol}"}])
+                    {"campo": "idRol", "detalle": f"No existe un rol activo con el identificador {id_rol}"}])
             activos = contar_usuarios_activos(self.db, id_rol)
             if activos:
                 texto_usuarios = "1 usuario activo" if activos == 1 else f"{activos} usuarios activos"
                 raise Conflicto("El rol tiene usuarios activos asignados", [
-                    {"field": "roleId", "detail": f"El rol {id_rol} tiene {texto_usuarios}"}])
+                    {"campo": "idRol", "detalle": f"El rol {id_rol} tiene {texto_usuarios}"}])
 
             rol = self.roles.cambiar_estado(id_rol, "inactivo", responsable)
             HistorialRepositorioSQLAlchemy(self.db).registrar("rol", id_rol, "estado", "activo", "inactivo",
                                                               responsable, motivo)
             self.db.commit()
 
-        return {"roleId": rol.id_rol, "name": rol.nombre, "status": api.estado(rol.estado), "reason": motivo}
+        return {"idRol": rol.id_rol, "nombre": rol.nombre, "estado": api.estado(rol.estado), "motivo": motivo}
 
 
 class ConsultarUsuariosDeRol:
@@ -140,12 +140,12 @@ class ConsultarUsuariosDeRol:
         with transaccion(self.db, self.MENSAJE_503):
             if RolRepositorioSQLAlchemy(self.db).buscar_por_id(id_rol) is None:
                 raise NoEncontrado("Rol no encontrado", [
-                    {"field": "roleId", "detail": f"No existe un rol con el identificador {id_rol}"}])
+                    {"campo": "idRol", "detalle": f"No existe un rol con el identificador {id_rol}"}])
             documentos = CredencialRepositorioSQLAlchemy(self.db).documentos_con_rol(id_rol)
             if not documentos:
                 raise NoEncontrado("Sin usuarios asignados", [
-                    {"field": "roleId", "detail": f"El rol {id_rol} no tiene usuarios asignados"}])
+                    {"campo": "idRol", "detalle": f"El rol {id_rol} no tiene usuarios asignados"}])
             usuarios = consultar_estado_usuario(self.db, documentos)
-        filas = [{"document": d, "fullName": u["nombres"], "site": u["sede"], "status": api.estado(u["estado"])}
+        filas = [{"documento": d, "nombres": u["nombres"], "sede": u["sede"], "estado": api.estado(u["estado"])}
                  for d, u in usuarios.items()]
-        return sorted(filas, key=lambda f: f["fullName"])
+        return sorted(filas, key=lambda f: f["nombres"])
