@@ -7,7 +7,7 @@ from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.catalogo import CombustibleEntrada, FactorConsumoEntrada, FactorEmisionEntrada, TipoVehiculoEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.services.use_cases.catalogo_combustibles import (
-    ActualizarFactorEmision, ConsultarCombustibles, RegistrarCombustible)
+    ActualizarFactorEmision, ConsultarCombustibles, ConsultarHistoricoEmision, RegistrarCombustible)
 from app.services.use_cases.catalogo_vehiculos import (
     ActualizarFactorConsumo, ConsultarHistoricoConsumo, ConsultarTiposVehiculo, RegistrarTipoVehiculo)
 
@@ -247,3 +247,34 @@ def actualizar_factor_emision(
     datos = ActualizarFactorEmision(db).ejecutar(idCombustible, entrada.factorEmisionKgCO2L, entrada.fechaInicio,
                                                  entrada.fuente, sesion.documento)
     return responder(201, "Factor de emisión actualizado correctamente", datos, funcionalidad="FUN-27")
+
+
+@router.get(
+    "/combustibles/{idCombustible}/factores-emision",
+    summary="HU-29 Consultar el histórico de factores de emisión de un combustible",
+    description="Retorna todos los factores del combustible con sus fechas, su fuente y su responsable, del más "
+                "reciente al más antiguo, señalando el vigente con vigente = true. Requiere el permiso FUN-29 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-29", ConsultarHistoricoEmision.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta del histórico de factores exitosa", [
+            {"valorKgCO2L": 2.63, "vigenteDesde": "2027-01-01", "vigenteHasta": None,
+             "fuente": "Fuente oficial (valor ilustrativo)", "responsable": "63456789", "vigente": True},
+            {"valorKgCO2L": 2.6, "vigenteDesde": "2026-11-01", "vigenteHasta": "2026-12-31",
+             "fuente": "Fuente oficial (valor ilustrativo)", "responsable": "63456789", "vigente": False}],
+            None, "FUN-29"),
+        400: ejemplo(400, "El identificador del combustible no es válido", None,
+                     [{"campo": "idCombustible", "detalle": "Debe tener el formato CB-XX"}], "FUN-29"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-29", "No tiene permiso para consultar el histórico"),
+        404: ejemplo(404, "Combustible no encontrado", None,
+                     [{"campo": "idCombustible", "detalle": "No existe un combustible con el identificador CB-09"}], "FUN-29"),
+        503: {"description": ConsultarHistoricoEmision.MENSAJE_503},
+    },
+)
+def consultar_historico_emision(
+    idCombustible: str = Path(..., description="Identificador del combustible, por ejemplo CB-01"),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-29", "No tiene permiso para consultar el histórico")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarHistoricoEmision(db).ejecutar(idCombustible)
+    return responder(200, "Consulta del histórico de factores exitosa", datos, funcionalidad="FUN-29")
