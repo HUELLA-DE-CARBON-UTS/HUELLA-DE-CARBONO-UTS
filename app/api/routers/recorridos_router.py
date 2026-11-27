@@ -5,9 +5,9 @@ from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.distancias import get_servicio_distancias
 from app.api.dependencies.roles import requiere_permiso
-from app.api.schemas.recorrido import RecorridoEntrada, ReprogramacionEntrada
+from app.api.schemas.recorrido import CancelacionEntrada, RecorridoEntrada, ReprogramacionEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.gestion_recorridos import ProgramarRecorrido, ReprogramarRecorrido
+from app.services.use_cases.gestion_recorridos import CancelarRecorrido, ProgramarRecorrido, ReprogramarRecorrido
 
 router = APIRouter(prefix="/api/v1/recorridos", tags=["MOD-05 Gestión de Recorridos"])
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
@@ -88,3 +88,36 @@ def reprogramar_recorrido(
     entrada = entrada or ReprogramacionEntrada()
     datos = ReprogramarRecorrido(db).ejecutar(codigo, entrada.fechaProgramada, entrada.placa, sesion.documento)
     return responder(200, "Recorrido reprogramado correctamente", datos, funcionalidad="FUN-37")
+
+
+@router.patch(
+    "/{codigo}/cancelacion",
+    summary="HU-38 Cancelar un recorrido programado con su motivo",
+    description="Solo se cancelan recorridos «programados». El recorrido queda «cancelado», no entra en ningún "
+                "indicador, y el vehículo vuelve a «disponible» (IC-04). La cancelación queda con motivo, fecha y "
+                "responsable. Requiere el permiso FUN-38 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-38", CancelarRecorrido.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Recorrido cancelado correctamente", {
+            "codigoRecorrido": "REC-0149", "estado": "cancelado", "motivo": "El cliente aplazó el despacho",
+            "placaLiberada": "SXR-215"}, None, "FUN-38"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-38", "No tiene permiso para cancelar recorridos"),
+        404: ejemplo(404, "Recorrido no encontrado", None,
+                     [{"campo": "codigoRecorrido", "detalle": "No existe el recorrido REC-9999"}], "FUN-38"),
+        409: ejemplo(409, "El recorrido no se puede cancelar", None,
+                     [{"campo": "codigoRecorrido", "detalle": "El recorrido REC-0140 ya está cerrado"}], "FUN-38"),
+        422: ejemplo(422, "Los datos de la cancelación no son válidos", None,
+                     [{"campo": "motivo", "detalle": "El motivo es obligatorio"}], "FUN-38"),
+        503: {"description": CancelarRecorrido.MENSAJE_503},
+    },
+)
+def cancelar_recorrido(
+    codigo: str = CODIGO,
+    entrada: CancelacionEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-38", "No tiene permiso para cancelar recorridos")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or CancelacionEntrada()
+    datos = CancelarRecorrido(db).ejecutar(codigo, entrada.motivo, sesion.documento)
+    return responder(200, "Recorrido cancelado correctamente", datos, funcionalidad="FUN-38")

@@ -16,3 +16,9 @@ class ReprogramacionEntrada(BaseModel):
     placa: str | None = Field(None, description="Placa del nuevo vehículo, que debe estar disponible")
 
     model_config = {"json_schema_extra": {"examples": [{"placa": "WFN-731", "fechaProgramada": "2026-12-20"}]}}
+
+
+class CancelacionEntrada(BaseModel):
+    motivo: str | None = Field(None, description="Motivo de la cancelación")
+
+    model_config = {"json_schema_extra": {"examples": [{"motivo": "El cliente aplazó el despacho"}]}}
