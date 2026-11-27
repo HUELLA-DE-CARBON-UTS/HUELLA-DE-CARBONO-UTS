@@ -32,6 +32,12 @@ class RecorridoRepositorioSQLAlchemy:
         modelo = self.sesion.get(RecorridoModelo, codigo)
         return _recorrido(modelo) if modelo else None
 
+    def actualizar(self, recorrido: Recorrido) -> None:
+        modelo = self.sesion.get(RecorridoModelo, recorrido.codigo)
+        for campo in CAMPOS_RECORRIDO:
+            setattr(modelo, campo, getattr(recorrido, campo))
+        self.sesion.flush()
+
     def abierto_de(self, placa: str) -> str | None:
         return self.sesion.scalar(select(RecorridoModelo.codigo).where(
             RecorridoModelo.placa == placa, RecorridoModelo.estado == "programado"))
