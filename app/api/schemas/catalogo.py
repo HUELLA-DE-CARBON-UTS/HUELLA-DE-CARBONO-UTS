@@ -38,3 +38,15 @@ class CombustibleEntrada(BaseModel):
         "fechaInicio": "2026-11-01",
         "fuente": "Fuente oficial consultada por API-EXT-03 (valor ilustrativo)",
     }]}}
+
+
+class FactorEmisionEntrada(BaseModel):
+    factorEmisionKgCO2L: Any = Field(None, description="Nuevo factor de emisión en kg CO₂/L, mayor que 0")
+    fechaInicio: str | None = Field(None, description="Fecha desde la que aplica el nuevo factor (AAAA-MM-DD)")
+    fuente: str | None = Field(None, description="Fuente oficial del nuevo factor")
+
+    model_config = {"json_schema_extra": {"examples": [{
+        "factorEmisionKgCO2L": 2.63,
+        "fechaInicio": "2027-01-01",
+        "fuente": "Fuente oficial consultada por API-EXT-03 (valor ilustrativo)",
+    }]}}
