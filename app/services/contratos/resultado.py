@@ -7,9 +7,9 @@ def cuerpo_estandar(codigo: int, mensaje: str, datos: Any = None, errores: list[
                     funcionalidad: str | None = None) -> dict:
     return {
         "success": codigo < 400,
-        "status": codigo,
+        "codigo": codigo,
         "message": mensaje,
         "data": datos,
-        "errors": errores or [],
-        "metadata": {"feature": funcionalidad, "timestamp": ahora().isoformat()},
+        "errores": errores or [],
+        "metadatos": {"funcionalidad": funcionalidad, "fecha": ahora().isoformat()},
     }

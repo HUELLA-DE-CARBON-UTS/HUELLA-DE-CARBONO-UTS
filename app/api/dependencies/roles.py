@@ -13,16 +13,16 @@ def requiere_permiso(operacion: str, mensaje_403: str):
 
     def dependencia(request: Request, sesion: Sesion = Depends(sesion_del_token), db: Session = Depends(get_db)) -> SesionUsuario:
         resultado = verificar_permiso(db, sesion.id_sesion, operacion)
-        codigo = resultado["status"]
+        codigo = resultado["codigo"]
         if codigo == 200:
             return SesionUsuario(id_sesion=sesion.id_sesion, documento=sesion.documento)
         if codigo == 401:
             raise SIN_SESION
         if codigo == 403:
-            raise PermisoDenegado(mensaje_403, [{"field": "session", "detail": resultado["errors"][0]["detail"]}])
+            raise PermisoDenegado(mensaje_403, [{"campo": "sesion", "detalle": resultado["errores"][0]["detalle"]}])
         if codigo == 503:
             mensaje = datos_de_ruta(request).get("x-mensaje-503", resultado["message"])
-            raise ServicioNoDisponible(mensaje, resultado["errors"])
-        raise ErrorNegocio(resultado["message"], resultado["errors"])
+            raise ServicioNoDisponible(mensaje, resultado["errores"])
+        raise ErrorNegocio(resultado["message"], resultado["errores"])
 
     return dependencia

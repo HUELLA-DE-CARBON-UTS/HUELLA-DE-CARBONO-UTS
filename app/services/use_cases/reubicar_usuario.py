@@ -20,22 +20,22 @@ class ReubicarUsuario:
         documento, sede_destino = documento.strip(), v.limpiar(sede_destino)
         if not sede_destino:
             raise DatosNoValidos("Los datos del traslado no son válidos", [
-                {"field": "destinationSite", "detail": "La sede de destino es obligatoria"}])
+                {"campo": "sedeDestino", "detalle": "La sede de destino es obligatoria"}])
 
         with transaccion(self.db, MENSAJE_503):
             usuario = self.usuarios.buscar_por_documento(documento)
             if usuario is None or usuario.estado != "activo":
                 raise NoEncontrado("Usuario no encontrado", [
-                    {"field": "document", "detail": f"No existe un usuario activo con el documento {documento}"}])
+                    {"campo": "documento", "detalle": f"No existe un usuario activo con el documento {documento}"}])
 
             origen = consultar_sede(self.db, usuario.id_sede) if usuario.id_sede else {"existe": False}
             destino = consultar_sede(self.db, sede_destino)
-            error = error_de_sede(destino, sede_destino, "destinationSite")
+            error = error_de_sede(destino, sede_destino, "sedeDestino")
             if error:
                 raise DatosNoValidos(SEDE_NO_VALIDA, [error])
             if destino["idSede"] == usuario.id_sede:
                 raise DatosNoValidos(SEDE_NO_VALIDA, [
-                    {"field": "destinationSite", "detail": "La sede de destino es la misma sede actual del usuario"}])
+                    {"campo": "sedeDestino", "detalle": "La sede de destino es la misma sede actual del usuario"}])
 
             usuario.id_sede = destino["idSede"]
             self.usuarios.actualizar(usuario)
@@ -44,5 +44,5 @@ class ReubicarUsuario:
                                      responsable)
             self.db.commit()
 
-        return {"document": documento, "originSite": nombre_origen, "destinationSite": destino["nombre"],
-                "transferDate": ahora().date().isoformat()}
+        return {"documento": documento, "sedeOrigen": nombre_origen, "sedeDestino": destino["nombre"],
+                "fechaTraslado": ahora().date().isoformat()}

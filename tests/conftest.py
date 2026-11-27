@@ -15,7 +15,7 @@ from app.repositories.database.conexion import Base, crear_motor
 from app.repositories.database.inicializacion import inicializar_base_de_datos
 from main import app
 
-ADMIN = {"username": "1000000000", "password": "Clave-Pruebas-2026"}
+ADMIN = {"usuario": "1000000000", "contrasena": "Clave-Pruebas-2026"}
 
 
 @pytest.fixture()

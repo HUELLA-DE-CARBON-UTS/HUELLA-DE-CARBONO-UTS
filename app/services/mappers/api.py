@@ -1,28 +1,25 @@
-ESTADOS = {"activo": "active", "activa": "active", "inactivo": "inactive", "inactiva": "inactive"}
-EVENTOS = {"ingreso": "login", "intento_fallido": "failed_login", "operacion_rechazada": "rejected_operation",
-           "salida": "logout"}
-ACCIONES = {"creado": "created", "actualizado": "updated"}
+EVENTOS = ("ingreso", "intento_fallido", "operacion_rechazada", "salida")
 
 
 def estado(valor: str | None) -> str | None:
-    return ESTADOS.get(valor, valor)
+    return valor
 
 
 def evento(valor: str) -> str:
-    return EVENTOS.get(valor, valor)
+    return valor
 
 
 def accion(valor: str) -> str:
-    return ACCIONES.get(valor, valor)
+    return valor
 
 
 def estado_interno(valor: str, femenino: bool = False) -> str | None:
-    if valor == "active":
+    if valor in ("activo", "activa"):
         return "activa" if femenino else "activo"
-    if valor == "inactive":
+    if valor in ("inactivo", "inactiva"):
         return "inactiva" if femenino else "inactivo"
     return None
 
 
 def evento_interno(valor: str) -> str | None:
-    return {v: k for k, v in EVENTOS.items()}.get(valor)
+    return valor if valor in EVENTOS else None

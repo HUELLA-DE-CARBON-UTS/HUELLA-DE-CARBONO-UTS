@@ -30,23 +30,23 @@ class RegistrarUsuario:
         }
         v.validar_registro(datos)
 
-        conflicto = Conflicto(DUPLICADO, [{"field": "document", "detail": "El documento o el correo ya está registrado"}])
+        conflicto = Conflicto(DUPLICADO, [{"campo": "documento", "detalle": "El documento o el correo ya está registrado"}])
         with transaccion(self.db, MENSAJE_503, conflicto):
             repetidos = []
             if self.usuarios.buscar_por_documento(datos["documento"]):
-                repetidos.append({"field": "document", "detail": f"El documento {datos['documento']} ya está registrado"})
+                repetidos.append({"campo": "documento", "detalle": f"El documento {datos['documento']} ya está registrado"})
             if self.usuarios.buscar_por_correo(datos["correo"]):
-                repetidos.append({"field": "email", "detail": f"El correo {datos['correo']} ya está registrado"})
+                repetidos.append({"campo": "correo", "detalle": f"El correo {datos['correo']} ya está registrado"})
             if repetidos:
                 raise Conflicto(DUPLICADO, repetidos)
 
             sede = consultar_sede(self.db, datos["sede"])
             rol = consultar_rol(self.db, datos["rol"])
-            no_disponibles = [e for e in [error_de_sede(sede, datos["sede"], "site")] if e]
+            no_disponibles = [e for e in [error_de_sede(sede, datos["sede"], "sede")] if e]
             if rol is None:
-                no_disponibles.append({"field": "role", "detail": f"El rol {datos['rol']} no existe"})
+                no_disponibles.append({"campo": "rol", "detalle": f"El rol {datos['rol']} no existe"})
             elif rol.estado != "activo":
-                no_disponibles.append({"field": "role", "detail": f"El rol {rol.nombre} se encuentra inactivo"})
+                no_disponibles.append({"campo": "rol", "detalle": f"El rol {rol.nombre} se encuentra inactivo"})
             if no_disponibles:
                 raise DatosNoValidos("La sede o el rol indicados no están disponibles", no_disponibles)
 
@@ -67,8 +67,8 @@ class RegistrarUsuario:
             f"Al ingresar por primera vez el sistema le pedirá cambiarla.",
         )
         respuesta = {
-            "userId": usuario.id_usuario, "document": usuario.documento, "fullName": usuario.nombres,
-            "email": usuario.correo, "role": rol.nombre, "site": sede["nombre"], "status": api.estado(usuario.estado),
-            "credentialsSent": enviadas,
+            "idUsuario": usuario.id_usuario, "documento": usuario.documento, "nombres": usuario.nombres,
+            "correo": usuario.correo, "rol": rol.nombre, "sede": sede["nombre"], "estado": api.estado(usuario.estado),
+            "credencialesEnviadas": enviadas,
         }
         return respuesta, enviadas

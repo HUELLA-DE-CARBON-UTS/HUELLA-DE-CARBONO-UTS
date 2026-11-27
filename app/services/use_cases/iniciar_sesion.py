@@ -12,7 +12,7 @@ MENSAJE_503 = "No fue posible iniciar la sesión"
 
 def credenciales_incorrectas() -> SesionNoValida:
     return SesionNoValida("Usuario o contraseña incorrectos", [
-        {"field": "credentials", "detail": "Las credenciales no coinciden"}])
+        {"campo": "credenciales", "detalle": "Las credenciales no coinciden"}])
 
 
 class IniciarSesion:
@@ -27,9 +27,9 @@ class IniciarSesion:
         contrasena = contrasena or ""
         errores = []
         if not usuario:
-            errores.append({"field": "username", "detail": "El usuario es obligatorio"})
+            errores.append({"campo": "usuario", "detalle": "El usuario es obligatorio"})
         if not contrasena:
-            errores.append({"field": "password", "detail": "La contraseña es obligatoria"})
+            errores.append({"campo": "contrasena", "detalle": "La contraseña es obligatoria"})
         if errores:
             raise DatosNoValidos("Los datos de ingreso no son válidos", errores)
 
@@ -50,7 +50,7 @@ class IniciarSesion:
             if info is None or info["estado"] != "activo":
                 self._fallido(documento)
                 raise PermisoDenegado("El usuario no puede ingresar al sistema", [
-                    {"field": "username", "detail": "El usuario se encuentra inactivo"}])
+                    {"campo": "usuario", "detalle": "El usuario se encuentra inactivo"}])
 
             if credencial.temporal:
                 self.credenciales.marcar_usada(documento)
@@ -59,8 +59,8 @@ class IniciarSesion:
                                                    fecha=sesion.fecha_ingreso, id_sesion=sesion.id_sesion))
             self.db.commit()
 
-        datos = {"sessionId": sesion.id_sesion, "user": documento, "role": credencial.nombre_rol,
-                 "site": info["sede"], "passwordChangeRequired": credencial.temporal}
+        datos = {"idSesion": sesion.id_sesion, "usuario": documento, "rol": credencial.nombre_rol,
+                 "sede": info["sede"], "requiereCambioContrasena": credencial.temporal}
         return datos, token
 
     def _fallido(self, usuario: str) -> None:

@@ -22,7 +22,7 @@ class RestablecerContrasena:
         correo = v.limpiar(correo).lower()
         if not documento and not correo:
             raise DatosNoValidos("Los datos del restablecimiento no son válidos", [
-                {"field": "document", "detail": "Debe indicar el documento o el correo del usuario"}])
+                {"campo": "documento", "detalle": "Debe indicar el documento o el correo del usuario"}])
 
         with transaccion(self.db, MENSAJE_503):
             if not documento:
@@ -33,7 +33,7 @@ class RestablecerContrasena:
             info = consultar_estado_usuario(self.db, [documento]).get(documento) if documento else None
             if info is None or info["estado"] != "activo" or self.credenciales.buscar(documento) is None:
                 raise NoEncontrado("Usuario no encontrado", [
-                    {"field": "document", "detail": f"No existe un usuario activo con {referencia}"}])
+                    {"campo": "documento", "detalle": f"No existe un usuario activo con {referencia}"}])
 
             temporal = generar_temporal()
             self.credenciales.reemplazar_contrasena(documento, generar_hash(temporal), temporal=True)
@@ -51,8 +51,8 @@ class RestablecerContrasena:
             if not enviado:
                 self.db.rollback()
                 raise ServicioNoDisponible("No fue posible enviar la credencial temporal", [
-                    {"field": "email", "detail": "El servicio de correo (API-EXT-04) no respondió"}])
+                    {"campo": "correo", "detalle": "El servicio de correo (API-EXT-04) no respondió"}])
             self.db.commit()
 
-        return {"document": documento, "destinationEmail": enmascarar_correo(info["correo"]),
-                "closedSessions": cerradas, "temporaryCredentialSent": True}
+        return {"documento": documento, "correoDestino": enmascarar_correo(info["correo"]),
+                "sesionesCerradas": cerradas, "credencialTemporalEnviada": True}
