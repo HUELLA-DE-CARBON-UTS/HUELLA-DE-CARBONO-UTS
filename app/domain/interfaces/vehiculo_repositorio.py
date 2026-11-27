@@ -1,0 +1,11 @@
+from typing import Protocol
+
+from app.domain.entities.vehiculo import FichaTecnica, Vehiculo
+
+
+class VehiculoRepositorio(Protocol):
+    def buscar(self, placa: str) -> Vehiculo | None: ...
+
+    def guardar(self, vehiculo: Vehiculo, ficha: FichaTecnica) -> None: ...
+
+    def agregar_ficha(self, placa: str, ficha: FichaTecnica) -> None: ...
