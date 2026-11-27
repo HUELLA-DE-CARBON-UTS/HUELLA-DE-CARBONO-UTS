@@ -17,3 +17,12 @@ class VehiculoEntrada(BaseModel):
         "capacidadT": 34,
         "sede": "Bucaramanga",
     }]}}
+
+
+class FichaTecnicaEntrada(BaseModel):
+    tipoVehiculo: str | None = Field(None, description="Nuevo tipo de vehículo (nombre o TV-XX)")
+    combustible: str | None = Field(None, description="Nuevo combustible (nombre o CB-XX)")
+    capacidadT: Any = Field(None, description="Nueva capacidad de carga en toneladas, mayor que 0")
+    aplicaDesde: str | None = Field(None, description="Fecha desde la que aplica el cambio (AAAA-MM-DD)")
+
+    model_config = {"json_schema_extra": {"examples": [{"combustible": "Gas natural vehicular", "aplicaDesde": "2026-11-10"}]}}
