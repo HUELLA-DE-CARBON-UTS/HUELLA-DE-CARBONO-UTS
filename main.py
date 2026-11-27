@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.middleware.manejo_errores import registrar_manejadores
-from app.api.routers import catalogo_router, parametrizacion_router, seguridad_router, usuarios_router
+from app.api.routers import catalogo_router, parametrizacion_router, seguridad_router, usuarios_router, vehiculos_router
 from app.api.schemas.ejemplos_openapi import conservar_nulos_en_ejemplos
 from app.repositories.config.settings import settings
 from app.repositories.database.conexion import SessionLocal, engine
@@ -31,6 +31,7 @@ app.include_router(usuarios_router.router)
 app.include_router(seguridad_router.router)
 app.include_router(parametrizacion_router.router)
 app.include_router(catalogo_router.router)
+app.include_router(vehiculos_router.router)
 conservar_nulos_en_ejemplos(app)
 
 
