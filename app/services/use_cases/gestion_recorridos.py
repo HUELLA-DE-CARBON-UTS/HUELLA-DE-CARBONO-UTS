@@ -130,3 +130,35 @@ class ReprogramarRecorrido:
 
         return {"codigoRecorrido": codigo, "placaAnterior": placa_anterior, "placaNueva": recorrido.placa,
                 "fechaProgramada": recorrido.fecha_programada.isoformat()}
+
+
+class CancelarRecorrido:
+
+    MENSAJE_503 = "No fue posible cancelar el recorrido"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = RecorridoRepositorioSQLAlchemy(db)
+        self.historial = HistorialRepositorioSQLAlchemy(db)
+
+    def ejecutar(self, codigo, motivo, responsable: str) -> dict:
+        codigo, motivo = v.normalizar_codigo(codigo), limpiar(motivo)
+        if not motivo:
+            raise DatosNoValidos("Los datos de la cancelación no son válidos", [
+                {"campo": "motivo", "detalle": "El motivo es obligatorio"}])
+
+        with transaccion(self.db, self.MENSAJE_503):
+            recorrido = self.repositorio.buscar(codigo)
+            if recorrido is None:
+                raise _no_encontrado(codigo)
+            if recorrido.estado != "programado":
+                raise Conflicto("El recorrido no se puede cancelar", [
+                    {"campo": "codigoRecorrido", "detalle": f"El recorrido {codigo} ya está {recorrido.estado}"}])
+            recorrido.estado, recorrido.motivo_cancelacion = "cancelado", motivo
+            self.repositorio.actualizar(recorrido)
+            cambiar_estado_operativo_vehiculo(self.db, recorrido.placa, "disponible")
+            self.historial.registrar("recorrido", codigo, "estado", "programado", "cancelado", responsable, motivo)
+            self.db.commit()
+
+        return {"codigoRecorrido": codigo, "estado": recorrido.estado, "motivo": motivo,
+                "placaLiberada": recorrido.placa}
