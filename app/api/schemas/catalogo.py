@@ -22,3 +22,19 @@ class FactorConsumoEntrada(BaseModel):
     startDate: str | None = Field(None, description="Fecha desde la que aplica el nuevo factor (AAAA-MM-DD)")
 
     model_config = {"json_schema_extra": {"examples": [{"consumptionFactorLkm": 0.118, "startDate": "2027-01-01"}]}}
+
+
+class CombustibleEntrada(BaseModel):
+    name: str | None = Field(None, description="Nombre del combustible, por ejemplo «Diésel»")
+    description: str | None = Field(None, description="Descripción del combustible")
+    emissionFactorKgCO2L: Any = Field(None, description="Factor de emisión en kg CO₂ por litro, mayor que 0")
+    startDate: str | None = Field(None, description="Fecha desde la que aplica el factor (AAAA-MM-DD)")
+    source: str | None = Field(None, description="Fuente oficial del factor confirmado por el administrador")
+
+    model_config = {"json_schema_extra": {"examples": [{
+        "name": "Diésel",
+        "description": "Combustible diésel para transporte de carga",
+        "emissionFactorKgCO2L": 2.6,
+        "startDate": "2026-11-01",
+        "source": "Fuente oficial consultada por API-EXT-03 (valor ilustrativo)",
+    }]}}

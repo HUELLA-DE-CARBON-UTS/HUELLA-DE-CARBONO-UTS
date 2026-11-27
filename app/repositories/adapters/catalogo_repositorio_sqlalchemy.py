@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.domain.entities.catalogo import ElementoCatalogo, Factor
 from app.domain.value_objects.fecha import ahora
-from app.repositories.database.modelos_catalogo import FactorConsumoModelo, TipoVehiculoModelo
+from app.repositories.database.modelos_catalogo import (
+    CombustibleModelo, FactorConsumoModelo, FactorEmisionModelo, TipoVehiculoModelo)
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,7 @@ class Configuracion:
 
 
 TIPOS_VEHICULO = Configuracion(TipoVehiculoModelo, "id_tipo", FactorConsumoModelo, "TV", False)
+COMBUSTIBLES = Configuracion(CombustibleModelo, "id_combustible", FactorEmisionModelo, "CB", True)
 
 
 class CatalogoRepositorioSQLAlchemy:
