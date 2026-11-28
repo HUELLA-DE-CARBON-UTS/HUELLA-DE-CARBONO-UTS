@@ -8,7 +8,8 @@ from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.recorrido import (
     CancelacionEntrada, CierreEntrada, CorreccionCierreEntrada, RecorridoEntrada, ReprogramacionEntrada)
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.consultas_recorridos import ConsultarHistorialRecorridos, ConsultarRecorrido
+from app.services.use_cases.consultas_recorridos import (
+    ConsultarHistorialRecorridos, ConsultarPendientesCierre, ConsultarRecorrido)
 from app.services.use_cases.gestion_recorridos import (
     CancelarRecorrido, CerrarRecorrido, CorregirCierre, ProgramarRecorrido, ReprogramarRecorrido)
 
@@ -92,6 +93,37 @@ def consultar_historial_recorridos(
 ):
     datos = ConsultarHistorialRecorridos(db).ejecutar(fechaInicial, fechaFinal, sede, estado)
     return responder(200, "Consulta del historial exitosa", datos, funcionalidad="FUN-42")
+
+
+@router.get(
+    "/pendientes-cierre",
+    summary="HU-43 Consultar los recorridos programados que ya debieron cerrarse",
+    description="Toma la fecha actual como referencia y retorna los recorridos «programados» con fecha vencida, del "
+                "más atrasado al más reciente, con sus días de atraso. Filtros opcionales por sede (IC-16) o placa. "
+                "Requiere el permiso FUN-43 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-43", ConsultarPendientesCierre.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de recorridos pendientes de cierre exitosa", [
+            {"codigoRecorrido": "REC-0158", "placa": "WFN-731", "fechaProgramada": "2026-11-14", "diasAtraso": 6},
+            {"codigoRecorrido": "REC-0160", "placa": "SXR-215", "fechaProgramada": "2026-11-18", "diasAtraso": 2}],
+            None, "FUN-43"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-43", "No tiene permiso para consultar los pendientes"),
+        404: ejemplo(404, "Sin recorridos pendientes de cierre", None,
+                     [{"campo": "sede", "detalle": "No hay recorridos vencidos en la sede Cúcuta"}], "FUN-43"),
+        422: ejemplo(422, "Los parámetros de consulta no son válidos", None,
+                     [{"campo": "placa", "detalle": "La placa debe tener el formato AAA-000"}], "FUN-43"),
+        503: {"description": ConsultarPendientesCierre.MENSAJE_503},
+    },
+)
+def consultar_pendientes_cierre(
+    sede: str | None = Query(None, description="Nombre o identificador (SED-XX) de la sede"),
+    placa: str | None = Query(None, description="Placa del vehículo (AAA-000)"),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-43", "No tiene permiso para consultar los pendientes")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarPendientesCierre(db).ejecutar(sede, placa)
+    return responder(200, "Consulta de recorridos pendientes de cierre exitosa", datos, funcionalidad="FUN-43")
 
 
 @router.patch(
