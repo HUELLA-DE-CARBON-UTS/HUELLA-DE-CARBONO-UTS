@@ -8,12 +8,14 @@ from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.recorrido import (
     CancelacionEntrada, CierreEntrada, CorreccionCierreEntrada, RecorridoEntrada, ReprogramacionEntrada)
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
+from app.services.use_cases.consultas_recorridos import ConsultarRecorrido
 from app.services.use_cases.gestion_recorridos import (
     CancelarRecorrido, CerrarRecorrido, CorregirCierre, ProgramarRecorrido, ReprogramarRecorrido)
 
 router = APIRouter(prefix="/api/v1/recorridos", tags=["MOD-05 Gestión de Recorridos"])
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
 CODIGO = Path(..., description="Código del recorrido, por ejemplo REC-0152")
+FORMATO_CODIGO = [{"campo": "codigoRecorrido", "detalle": "Debe tener el formato REC-0000"}]
 
 
 def _sin_permiso(funcionalidad: str, mensaje: str) -> dict:
@@ -199,3 +201,33 @@ def corregir_cierre(
     datos = CorregirCierre(db).ejecutar(codigo, entrada.distanciaKm, entrada.consumoRegistradoL, entrada.motivo,
                                         sesion.documento)
     return responder(200, "Cierre corregido y resultados recalculados", datos, funcionalidad="FUN-40")
+
+
+@router.get(
+    "/{codigo}",
+    summary="HU-41 Consultar el detalle de un recorrido con sus resultados de cálculo",
+    description="Retorna vehículo, origen, destino, estado, distancia y litros del recorrido. Si está cerrado incluye "
+                "consumo estimado, desviación, emisiones y factores usados (IC-08); si está programado o cancelado, "
+                "los cálculos aparecen como «no aplica». Requiere el permiso FUN-41 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-41", ConsultarRecorrido.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta del recorrido exitosa", {
+            "codigoRecorrido": "REC-0152", "placa": "TTK-482", "origen": "Bucaramanga", "destino": "Barranquilla",
+            "estado": "cerrado", "distanciaKm": 400, "consumoRegistradoL": 55.0, "consumoEstimadoL": 50.0,
+            "desviacionPct": 10.0, "emisionesKgCO2": 143.0, "factorConsumoLkm": 0.125, "factorEmisionKgCO2L": 2.6},
+            None, "FUN-41"),
+        400: ejemplo(400, "El código del recorrido no es válido", None, FORMATO_CODIGO, "FUN-41"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-41", "No tiene permiso para consultar el recorrido"),
+        404: ejemplo(404, "Recorrido no encontrado", None,
+                     [{"campo": "codigoRecorrido", "detalle": "No existe el recorrido REC-9999"}], "FUN-41"),
+        503: {"description": ConsultarRecorrido.MENSAJE_503},
+    },
+)
+def consultar_recorrido(
+    codigo: str = CODIGO,
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-41", "No tiene permiso para consultar el recorrido")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarRecorrido(db).ejecutar(codigo)
+    return responder(200, "Consulta del recorrido exitosa", datos, funcionalidad="FUN-41")
