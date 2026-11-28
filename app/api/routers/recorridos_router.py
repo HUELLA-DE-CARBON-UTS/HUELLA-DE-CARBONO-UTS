@@ -9,7 +9,8 @@ from app.api.schemas.recorrido import (
     CancelacionEntrada, CierreEntrada, CorreccionCierreEntrada, RecorridoEntrada, ReprogramacionEntrada)
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.services.use_cases.consultas_recorridos import (
-    ConsultarHistorialRecorridos, ConsultarPendientesCierre, ConsultarRecorrido, ConsultarRecorridosVehiculo)
+    ConsultarCalculosPendientes, ConsultarHistorialRecorridos, ConsultarPendientesCierre, ConsultarRecorrido,
+    ConsultarRecorridosVehiculo)
 from app.services.use_cases.gestion_recorridos import (
     CancelarRecorrido, CerrarRecorrido, CorregirCierre, ProgramarRecorrido, ReprogramarRecorrido)
 
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/api/v1/recorridos", tags=["MOD-05 Gestión de Recorr
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
 CODIGO = Path(..., description="Código del recorrido, por ejemplo REC-0152")
 FORMATO_CODIGO = [{"campo": "codigoRecorrido", "detalle": "Debe tener el formato REC-0000"}]
+FORMATO_FECHA = [{"campo": "fechaInicial", "detalle": "Formato de fecha no válido. Debe ser YYYY-MM-DD"}]
 RANGO = [{"campo": "fechaInicial", "detalle": "La fecha inicial no puede ser posterior a la fecha final"}]
 
 
@@ -124,6 +126,37 @@ def consultar_pendientes_cierre(
 ):
     datos = ConsultarPendientesCierre(db).ejecutar(sede, placa)
     return responder(200, "Consulta de recorridos pendientes de cierre exitosa", datos, funcionalidad="FUN-43")
+
+
+@router.get(
+    "/calculos-pendientes",
+    summary="HU-45 Consultar los recorridos cerrados cuyo cálculo quedó pendiente",
+    description="Retorna los recorridos «cerrados» con el consumo estimado o las emisiones pendientes (IC-08), con la "
+                "causa de cada uno, ordenados por fecha de cierre. Filtros opcionales por rango de fechas o placa. "
+                "Requiere el permiso FUN-45 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-45", ConsultarCalculosPendientes.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de recorridos con cálculos pendientes exitosa", [
+            {"codigoRecorrido": "REC-0161", "placa": "EVN-102", "fechaCierre": "2026-11-19",
+             "causa": "El tipo Furgón eléctrico no tiene factor de consumo vigente"}], None, "FUN-45"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-45", "No tiene permiso para consultar los pendientes"),
+        404: ejemplo(404, "Sin recorridos con cálculos pendientes", None, [
+            {"campo": "fechaInicial",
+             "detalle": "Todos los recorridos cerrados del rango tienen sus cálculos completos"}], "FUN-45"),
+        422: ejemplo(422, "Los parámetros de consulta no son válidos", None, FORMATO_FECHA, "FUN-45"),
+        503: {"description": ConsultarCalculosPendientes.MENSAJE_503},
+    },
+)
+def consultar_calculos_pendientes(
+    fechaInicial: str | None = Query(None, description="Fecha inicial (AAAA-MM-DD)"),
+    fechaFinal: str | None = Query(None, description="Fecha final (AAAA-MM-DD)"),
+    placa: str | None = Query(None, description="Placa del vehículo (AAA-000)"),
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-45", "No tiene permiso para consultar los pendientes")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarCalculosPendientes(db).ejecutar(fechaInicial, fechaFinal, placa)
+    return responder(200, "Consulta de recorridos con cálculos pendientes exitosa", datos, funcionalidad="FUN-45")
 
 
 @router.get(

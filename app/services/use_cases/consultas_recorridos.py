@@ -129,3 +129,29 @@ class ConsultarRecorridosVehiculo:
                                 "distanciaKm": r.distancia_km, "litros": r.consumo_registrado_l} for r in recorridos],
                 "totalRecorridos": len(recorridos),
                 "distanciaTotalKm": round(sum(r.distancia_km for r in recorridos), 2)}
+
+
+class ConsultarCalculosPendientes:
+
+    MENSAJE_503 = "No fue posible consultar los recorridos con cálculos pendientes"
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def ejecutar(self, fecha_inicial=None, fecha_final=None, placa=None) -> list[dict]:
+        inicio, fin = v.rango_opcional(fecha_inicial, fecha_final)
+        placa = _validar_placa(placa)
+        with transaccion(self.db, self.MENSAJE_503):
+            filas = []
+            for r in consultar_datos_recorridos(self.db, inicio, fin, placa=placa or None):
+                resultado = consultar_resultado_recorrido(self.db, r.codigo)
+                if resultado is None or resultado.completo():
+                    continue
+                causas = [c for c in (resultado.causa_consumo, resultado.causa_emisiones) if c]
+                filas.append({"codigoRecorrido": r.codigo, "placa": r.placa, "fechaCierre": r.fecha_cierre.isoformat(),
+                              "causa": "; ".join(causas)})
+        if not filas:
+            raise NoEncontrado("Sin recorridos con cálculos pendientes", [
+                {"campo": "fechaInicial",
+                 "detalle": "Todos los recorridos cerrados del rango tienen sus cálculos completos"}])
+        return sorted(filas, key=lambda f: (f["fechaCierre"], f["codigoRecorrido"]))
