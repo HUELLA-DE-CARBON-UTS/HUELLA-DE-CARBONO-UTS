@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, String
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.repositories.database.conexion import Base
@@ -24,3 +24,28 @@ class RecorridoModelo(Base):
     motivo_cancelacion: Mapped[str] = mapped_column(String(300), default="")
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     responsable: Mapped[str] = mapped_column(String(20))
+
+
+class ResultadoRecorridoModelo(Base):
+    __tablename__ = "resultados_recorridos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    codigo: Mapped[str] = mapped_column(String(12), ForeignKey("recorridos.codigo"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    vigente: Mapped[bool] = mapped_column(Boolean, default=True)
+    distancia_km: Mapped[float] = mapped_column(Float)
+    consumo_registrado_l: Mapped[float] = mapped_column(Float)
+    estado_consumo: Mapped[str] = mapped_column(String(15))
+    causa_consumo: Mapped[str] = mapped_column(String(200), default="")
+    id_factor_consumo: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    factor_consumo_lkm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    consumo_estimado_l: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rendimiento_lkm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    desviacion_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    estado_emisiones: Mapped[str] = mapped_column(String(15))
+    causa_emisiones: Mapped[str] = mapped_column(String(200), default="")
+    id_factor_emision: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    factor_emision_kgco2l: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fuente_emision: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    emisiones_kgco2: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fecha_calculo: Mapped[datetime] = mapped_column(DateTime(timezone=True))

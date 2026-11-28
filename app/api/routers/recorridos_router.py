@@ -5,9 +5,10 @@ from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.distancias import get_servicio_distancias
 from app.api.dependencies.roles import requiere_permiso
-from app.api.schemas.recorrido import CancelacionEntrada, RecorridoEntrada, ReprogramacionEntrada
+from app.api.schemas.recorrido import CancelacionEntrada, CierreEntrada, RecorridoEntrada, ReprogramacionEntrada
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.gestion_recorridos import CancelarRecorrido, ProgramarRecorrido, ReprogramarRecorrido
+from app.services.use_cases.gestion_recorridos import (
+    CancelarRecorrido, CerrarRecorrido, ProgramarRecorrido, ReprogramarRecorrido)
 
 router = APIRouter(prefix="/api/v1/recorridos", tags=["MOD-05 Gestión de Recorridos"])
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
@@ -121,3 +122,41 @@ def cancelar_recorrido(
     entrada = entrada or CancelacionEntrada()
     datos = CancelarRecorrido(db).ejecutar(codigo, entrada.motivo, sesion.documento)
     return responder(200, "Recorrido cancelado correctamente", datos, funcionalidad="FUN-38")
+
+
+@router.post(
+    "/{codigo}/cierre",
+    summary="HU-39 Cerrar un recorrido con su distancia y litros consumidos",
+    description="Cierra un recorrido «programado» con la fecha, la distancia y los litros. La fecha de cierre no puede "
+                "ser anterior a la programada. Ejecuta IC-05 (consumo estimado, eficiencia y emisiones con los "
+                "factores vigentes en la fecha de cierre); si falta un factor, el recorrido queda cerrado y "
+                "estadoCalculo = «pendiente». El vehículo vuelve a «disponible» (IC-04). Requiere el permiso FUN-39 "
+                "(IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-39", CerrarRecorrido.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Recorrido cerrado correctamente", {
+            "codigoRecorrido": "REC-0152", "placa": "TTK-482", "distanciaKm": 400, "consumoRegistradoL": 55.0,
+            "consumoEstimadoL": 50.0, "rendimientoLkm": 0.1375, "desviacionPct": 10.0, "emisionesKgCO2": 143.0,
+            "estadoCalculo": "completo"}, None, "FUN-39"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-39", "No tiene permiso para cerrar recorridos"),
+        404: ejemplo(404, "Recorrido no encontrado", None,
+                     [{"campo": "codigoRecorrido", "detalle": "No existe el recorrido REC-9999"}], "FUN-39"),
+        409: ejemplo(409, "El recorrido no se puede cerrar en su estado actual", None,
+                     [{"campo": "codigoRecorrido", "detalle": 'El recorrido REC-0149 está en estado "cancelado"'}],
+                     "FUN-39"),
+        422: ejemplo(422, "Los datos del cierre no son válidos", None,
+                     [{"campo": "distanciaKm", "detalle": "Debe ser mayor que 0 (RN-05)"}], "FUN-39"),
+        503: {"description": CerrarRecorrido.MENSAJE_503},
+    },
+)
+def cerrar_recorrido(
+    codigo: str = CODIGO,
+    entrada: CierreEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso("FUN-39", "No tiene permiso para cerrar recorridos")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or CierreEntrada()
+    datos = CerrarRecorrido(db).ejecutar(codigo, entrada.fechaCierre, entrada.distanciaKm,
+                                         entrada.consumoRegistradoL, sesion.documento)
+    return responder(200, "Recorrido cerrado correctamente", datos, funcionalidad="FUN-39")
