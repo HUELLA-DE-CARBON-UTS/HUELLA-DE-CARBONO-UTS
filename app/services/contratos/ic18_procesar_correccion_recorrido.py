@@ -48,6 +48,27 @@ def _recalcular_consumo(db: Session, codigo: str, distancia, consumo) -> tuple:
         "versionAnterior": {"version": anterior.version, "desviacionPct": anterior.desviacion_pct}}, []
 
 
+def _recalcular_emisiones(db: Session, codigo: str, consumo) -> tuple:
+    error = v.error_positivo("consumoRegistradoL", consumo, "Debe ser mayor que 0")
+    if error:
+        return 422, "El consumo corregido no es válido", None, [error]
+    repositorio = RecorridoRepositorioSQLAlchemy(db)
+    codigo = v.normalizar_codigo(codigo)
+    recorrido, anterior = repositorio.buscar(codigo), repositorio.resultado_vigente(codigo)
+    if recorrido is None or recorrido.estado != "cerrado":
+        return 409, "El recorrido no tiene emisiones calculadas", None, [
+            {"campo": "codigoRecorrido", "detalle": f"El recorrido {codigo} no está cerrado"}]
+    if anterior is None or anterior.estado_emisiones != "completo":
+        return 409, "El recorrido no tiene emisiones calculadas", None, [
+            {"campo": "codigoRecorrido", "detalle": f"El recorrido {codigo} tiene las emisiones pendientes"}]
+    anterior, nuevo = procesar_correccion_recorrido(db, codigo, recorrido.distancia_km, v.positivo(consumo))
+    db.commit()
+    return 200, "Emisiones recalculadas", {
+        "codigoRecorrido": codigo, "version": nuevo.version, "consumoRegistradoL": nuevo.consumo_registrado_l,
+        "factorEmisionKgCO2L": nuevo.factor_emision_kgco2l, "emisionesKgCO2": nuevo.emisiones_kgco2,
+        "versionAnterior": {"version": anterior.version, "emisionesKgCO2": anterior.emisiones_kgco2}}, []
+
+
 def _contrato(db: Session, funcionalidad: str, mensaje_503: str, calculo, *argumentos) -> dict:
     try:
         return cuerpo_estandar(*calculo(db, *argumentos), funcionalidad)
@@ -59,3 +80,8 @@ def _contrato(db: Session, funcionalidad: str, mensaje_503: str, calculo, *argum
 def recalcular_consumo(db: Session, codigo: str, distancia, consumo) -> dict:
     return _contrato(db, "FUN-48", "No fue posible recalcular el consumo del recorrido", _recalcular_consumo,
                      codigo, distancia, consumo)
+
+
+def recalcular_emisiones(db: Session, codigo: str, consumo) -> dict:
+    return _contrato(db, "FUN-52", "No fue posible recalcular las emisiones del recorrido", _recalcular_emisiones,
+                     codigo, consumo)
