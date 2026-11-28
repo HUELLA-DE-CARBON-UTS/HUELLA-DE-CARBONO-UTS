@@ -50,6 +50,9 @@ class RecorridoRepositorioSQLAlchemy:
         return self.sesion.scalar(select(RecorridoModelo.codigo).where(
             RecorridoModelo.placa == placa, RecorridoModelo.estado == "programado"))
 
+    def listar(self) -> list[Recorrido]:
+        return [_recorrido(m) for m in self.sesion.scalars(select(RecorridoModelo).order_by(RecorridoModelo.codigo))]
+
     def guardar_resultado(self, resultado: ResultadoRecorrido) -> None:
         anteriores = self.sesion.scalars(select(ResultadoRecorridoModelo).where(
             ResultadoRecorridoModelo.codigo == resultado.codigo, ResultadoRecorridoModelo.vigente.is_(True)))

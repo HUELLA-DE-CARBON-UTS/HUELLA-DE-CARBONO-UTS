@@ -8,6 +8,7 @@ from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, rut
 from app.api.schemas.vehiculo import EstadoSedeVehiculoEntrada, FichaTecnicaEntrada, VehiculoEntrada
 from app.services.use_cases.flota_vehiculos import (
     ActualizarEstadoSedeVehiculo, ActualizarFichaTecnica, ConsultarVehiculos, RegistrarVehiculo)
+from app.services.use_cases.hoja_vida_vehiculo import ConsultarHojaVidaVehiculo
 
 router = APIRouter(prefix="/api/v1/vehiculos", tags=["MOD-04 Gestión de Flota"])
 
@@ -159,3 +160,37 @@ def actualizar_estado_sede_vehiculo(
     entrada = entrada or EstadoSedeVehiculoEntrada()
     datos = ActualizarEstadoSedeVehiculo(db).ejecutar(placa, entrada.estado, entrada.sede, sesion.documento)
     return responder(200, "Vehículo actualizado correctamente", datos, funcionalidad="FUN-33")
+
+
+@router.get(
+    "/{placa}/hoja-de-vida",
+    summary="HU-35 Consultar la hoja de vida de un vehículo",
+    description="Retorna la ficha técnica vigente, la sede y el estado del vehículo, los cambios de ficha, estado y "
+                "sede del más reciente al más antiguo con fecha, valor anterior, valor nuevo y responsable, y su "
+                "actividad: total de recorridos cerrados y fecha del último (IC-17). Requiere el permiso FUN-35 "
+                "(IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-35", ConsultarHojaVidaVehiculo.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de la hoja de vida exitosa", {
+            "placa": "TTK-482",
+            "fichaActual": {"tipo": "Tractocamión", "combustible": "Diésel", "capacidadT": 34, "sede": "Bucaramanga",
+                            "estado": "disponible"},
+            "eventos": [{"fecha": "2026-11-12", "tipo": "estado", "valorAnterior": "fuera de servicio",
+                         "valorNuevo": "disponible", "responsable": "1098765432"}],
+            "totalRecorridos": 18, "ultimoRecorridoCerrado": "2026-11-19"}, None, "FUN-35"),
+        400: ejemplo(400, "La placa no es válida", None,
+                     [{"campo": "placa", "detalle": "La placa debe tener el formato AAA-000"}], "FUN-35"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-35", "No tiene permiso para consultar la hoja de vida"),
+        404: ejemplo(404, "Vehículo no encontrado", None,
+                     [{"campo": "placa", "detalle": "No existe un vehículo con la placa ABC-000"}], "FUN-35"),
+        503: {"description": ConsultarHojaVidaVehiculo.MENSAJE_503},
+    },
+)
+def consultar_hoja_vida_vehiculo(
+    placa: str = PLACA,
+    _sesion: SesionUsuario = Depends(requiere_permiso("FUN-35", "No tiene permiso para consultar la hoja de vida")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarHojaVidaVehiculo(db).ejecutar(placa)
+    return responder(200, "Consulta de la hoja de vida exitosa", datos, funcionalidad="FUN-35")
