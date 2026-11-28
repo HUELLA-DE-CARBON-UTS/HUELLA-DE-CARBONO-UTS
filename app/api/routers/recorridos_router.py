@@ -9,12 +9,14 @@ from app.api.schemas.recorrido import (
     CancelacionEntrada, CierreEntrada, CorreccionCierreEntrada, RecorridoEntrada, ReprogramacionEntrada)
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.services.use_cases.consultas_recorridos import (
-    ConsultarCalculosPendientes, ConsultarHistorialRecorridos, ConsultarPendientesCierre, ConsultarRecorrido,
-    ConsultarRecorridosVehiculo)
+    ConsultarCalculosPendientes, ConsultarConsumoRecorrido, ConsultarHistorialRecorridos,
+    ConsultarPendientesCierre, ConsultarRecorrido, ConsultarRecorridosVehiculo)
 from app.services.use_cases.gestion_recorridos import (
     CancelarRecorrido, CerrarRecorrido, CorregirCierre, ProgramarRecorrido, ReprogramarRecorrido)
 
 router = APIRouter(prefix="/api/v1/recorridos", tags=["MOD-05 Gestión de Recorridos"])
+
+EMISIONES = ["MOD-06 Gestión de Combustible y Emisiones"]
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
 CODIGO = Path(..., description="Código del recorrido, por ejemplo REC-0152")
 FORMATO_CODIGO = [{"campo": "codigoRecorrido", "detalle": "Debe tener el formato REC-0000"}]
@@ -363,3 +365,37 @@ def consultar_recorrido(
 ):
     datos = ConsultarRecorrido(db).ejecutar(codigo)
     return responder(200, "Consulta del recorrido exitosa", datos, funcionalidad="FUN-41")
+
+
+@router.get(
+    "/{codigo}/consumo",
+    tags=EMISIONES,
+    summary="HU-49 Consultar el consumo registrado, estimado y la desviación de un recorrido",
+    description="Solo para recorridos «cerrados». Retorna consumo registrado, consumo estimado, rendimiento, desviación "
+                "y factor usado (IC-19). Si el cálculo quedó pendiente responde 409 con la causa. Requiere el permiso "
+                "FUN-49 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-49", ConsultarConsumoRecorrido.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta del resultado de consumo exitosa", {
+            "codigoRecorrido": "REC-0152", "consumoRegistradoL": 55.0, "consumoEstimadoL": 50.0,
+            "rendimientoLkm": 0.1375, "desviacionPct": 10.0, "factorConsumoLkm": 0.125}, None, "FUN-49"),
+        400: ejemplo(400, "El código del recorrido no es válido", None, FORMATO_CODIGO, "FUN-49"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-49", "No tiene permiso para consultar el consumo del recorrido"),
+        404: ejemplo(404, "Recorrido no encontrado", None, [
+            {"campo": "codigoRecorrido", "detalle": "No existe un recorrido cerrado con el código REC-9999"}],
+            "FUN-49"),
+        409: ejemplo(409, "El cálculo de consumo está pendiente", None, [
+            {"campo": "codigoRecorrido",
+             "detalle": "El tipo Furgón eléctrico no tenía factor vigente en la fecha de cierre"}], "FUN-49"),
+        503: {"description": ConsultarConsumoRecorrido.MENSAJE_503},
+    },
+)
+def consultar_consumo_recorrido(
+    codigo: str = CODIGO,
+    _sesion: SesionUsuario = Depends(requiere_permiso(
+        "FUN-49", "No tiene permiso para consultar el consumo del recorrido")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarConsumoRecorrido(db).ejecutar(codigo)
+    return responder(200, "Consulta del resultado de consumo exitosa", datos, funcionalidad="FUN-49")
