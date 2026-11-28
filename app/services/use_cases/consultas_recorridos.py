@@ -2,8 +2,10 @@ from sqlalchemy.orm import Session
 
 from app.domain.exceptions.errores import DatosNoValidos, NoEncontrado
 from app.repositories.adapters.recorrido_repositorio_sqlalchemy import RecorridoRepositorioSQLAlchemy
+from app.services.contratos.ic03_consultar_disponibilidad_vehiculo import consultar_disponibilidad_vehiculo
 from app.services.contratos.ic08_consultar_resultado_recorrido import consultar_resultado_recorrido
 from app.services.contratos.ic16_consultar_vehiculos_por_criterio import placas_de_sede
+from app.services.contratos.ic19_consultar_datos_recorridos import consultar_datos_recorridos
 from app.services.use_cases.catalogo_comun import hoy
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import recorrido_validador as v
@@ -104,3 +106,26 @@ class ConsultarPendientesCierre:
         vencidos.sort(key=lambda r: (r.fecha_programada, r.codigo))
         return [{"codigoRecorrido": r.codigo, "placa": r.placa, "fechaProgramada": r.fecha_programada.isoformat(),
                  "diasAtraso": (dia - r.fecha_programada).days} for r in vencidos]
+
+
+class ConsultarRecorridosVehiculo:
+
+    MENSAJE_503 = "No fue posible consultar los recorridos del vehículo"
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def ejecutar(self, placa, fecha_inicial, fecha_final) -> dict:
+        placa = normalizar_placa(placa)
+        inicio, fin = v.rango_obligatorio(fecha_inicial, fecha_final)
+        with transaccion(self.db, self.MENSAJE_503):
+            if not consultar_disponibilidad_vehiculo(self.db, placa)["existe"]:
+                raise NoEncontrado("Vehículo no encontrado", [
+                    {"campo": "placa", "detalle": f"No existe un vehículo con la placa {placa}"}])
+            recorridos = consultar_datos_recorridos(self.db, inicio, fin, placa=placa)
+        recorridos.sort(key=lambda r: (r.fecha_cierre, r.codigo), reverse=True)
+        return {"placa": placa,
+                "recorridos": [{"codigoRecorrido": r.codigo, "fecha": r.fecha_cierre.isoformat(),
+                                "distanciaKm": r.distancia_km, "litros": r.consumo_registrado_l} for r in recorridos],
+                "totalRecorridos": len(recorridos),
+                "distanciaTotalKm": round(sum(r.distancia_km for r in recorridos), 2)}
