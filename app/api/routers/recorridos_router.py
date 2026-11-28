@@ -5,10 +5,11 @@ from app.api.dependencies.auth import SesionUsuario
 from app.api.dependencies.db import get_db
 from app.api.dependencies.distancias import get_servicio_distancias
 from app.api.dependencies.roles import requiere_permiso
-from app.api.schemas.recorrido import CancelacionEntrada, CierreEntrada, RecorridoEntrada, ReprogramacionEntrada
+from app.api.schemas.recorrido import (
+    CancelacionEntrada, CierreEntrada, CorreccionCierreEntrada, RecorridoEntrada, ReprogramacionEntrada)
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.services.use_cases.gestion_recorridos import (
-    CancelarRecorrido, CerrarRecorrido, ProgramarRecorrido, ReprogramarRecorrido)
+    CancelarRecorrido, CerrarRecorrido, CorregirCierre, ProgramarRecorrido, ReprogramarRecorrido)
 
 router = APIRouter(prefix="/api/v1/recorridos", tags=["MOD-05 Gestión de Recorridos"])
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
@@ -160,3 +161,41 @@ def cerrar_recorrido(
     datos = CerrarRecorrido(db).ejecutar(codigo, entrada.fechaCierre, entrada.distanciaKm,
                                          entrada.consumoRegistradoL, sesion.documento)
     return responder(200, "Recorrido cerrado correctamente", datos, funcionalidad="FUN-39")
+
+
+@router.patch(
+    "/{codigo}/cierre",
+    summary="HU-40 Corregir la distancia o los litros de un recorrido ya cerrado",
+    description="Solo se corrigen recorridos «cerrados». Los valores nuevos deben ser mayores que 0 y distintos de los "
+                "actuales, y el motivo es obligatorio. Se guardan los valores anteriores, los nuevos, el motivo, la "
+                "fecha y el responsable, y se recalcula con IC-18 usando los factores vigentes en la fecha del "
+                "recorrido; el resultado anterior queda como versión histórica. Requiere el permiso FUN-40 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-40", CorregirCierre.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Cierre corregido y resultados recalculados", {
+            "codigoRecorrido": "REC-0152", "valoresAnteriores": {"distanciaKm": 400, "consumoRegistradoL": 55.0},
+            "valoresNuevos": {"distanciaKm": 400, "consumoRegistradoL": 52.0}, "consumoEstimadoL": 50.0,
+            "desviacionPct": 4.0, "emisionesKgCO2": 135.2}, None, "FUN-40"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-40", "No tiene permiso para corregir el cierre de recorridos"),
+        404: ejemplo(404, "Recorrido no encontrado", None,
+                     [{"campo": "codigoRecorrido", "detalle": "No existe el recorrido REC-9999"}], "FUN-40"),
+        409: ejemplo(409, "El recorrido no está cerrado", None,
+                     [{"campo": "codigoRecorrido", "detalle": 'El recorrido REC-0160 está en estado "programado"'}],
+                     "FUN-40"),
+        422: ejemplo(422, "Los valores corregidos no son válidos", None, [
+            {"campo": "consumoRegistradoL", "detalle": "Debe ser mayor que 0 y distinto del valor actual"}], "FUN-40"),
+        503: {"description": CorregirCierre.MENSAJE_503},
+    },
+)
+def corregir_cierre(
+    codigo: str = CODIGO,
+    entrada: CorreccionCierreEntrada | None = Body(None),
+    sesion: SesionUsuario = Depends(requiere_permiso(
+        "FUN-40", "No tiene permiso para corregir el cierre de recorridos")),
+    db: Session = Depends(get_db),
+):
+    entrada = entrada or CorreccionCierreEntrada()
+    datos = CorregirCierre(db).ejecutar(codigo, entrada.distanciaKm, entrada.consumoRegistradoL, entrada.motivo,
+                                        sesion.documento)
+    return responder(200, "Cierre corregido y resultados recalculados", datos, funcionalidad="FUN-40")

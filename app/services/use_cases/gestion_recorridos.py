@@ -8,6 +8,7 @@ from app.services.contratos.ic03_consultar_disponibilidad_vehiculo import (
     consultar_disponibilidad_vehiculo, detalle_no_disponible)
 from app.services.contratos.ic04_cambiar_estado_operativo_vehiculo import cambiar_estado_operativo_vehiculo
 from app.services.contratos.ic05_procesar_cierre_recorrido import procesar_cierre_recorrido, resumen
+from app.services.contratos.ic18_procesar_correccion_recorrido import procesar_correccion_recorrido
 from app.services.use_cases.catalogo_comun import hoy
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import recorrido_validador as v
@@ -207,3 +208,61 @@ class CerrarRecorrido:
 
         return {"codigoRecorrido": codigo, "placa": recorrido.placa, "distanciaKm": recorrido.distancia_km,
                 "consumoRegistradoL": recorrido.consumo_registrado_l, **resumen(resultado)}
+
+
+class CorregirCierre:
+
+    MENSAJE_503 = "No fue posible corregir el cierre del recorrido"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = RecorridoRepositorioSQLAlchemy(db)
+        self.historial = HistorialRepositorioSQLAlchemy(db)
+
+    def ejecutar(self, codigo, distancia, consumo, motivo, responsable: str) -> dict:
+        codigo, motivo = v.normalizar_codigo(codigo), limpiar(motivo)
+        errores = []
+        if distancia is None and consumo is None:
+            errores.append({"campo": "datos", "detalle": "Debe indicar la distancia o los litros corregidos"})
+        if not motivo:
+            errores.append({"campo": "motivo", "detalle": "El motivo de la corrección es obligatorio"})
+        for campo, valor in (("distanciaKm", distancia), ("consumoRegistradoL", consumo)):
+            if valor is not None and v.positivo(valor) is None:
+                errores.append({"campo": campo, "detalle": "Debe ser mayor que 0 y distinto del valor actual"})
+        if errores:
+            raise DatosNoValidos("Los valores corregidos no son válidos", errores)
+
+        with transaccion(self.db, self.MENSAJE_503):
+            recorrido = self.repositorio.buscar(codigo)
+            if recorrido is None:
+                raise _no_encontrado(codigo)
+            if recorrido.estado != "cerrado":
+                raise Conflicto("El recorrido no está cerrado", [
+                    {"campo": "codigoRecorrido",
+                     "detalle": f'El recorrido {codigo} está en estado "{recorrido.estado}"'}])
+
+            anteriores = {"distanciaKm": recorrido.distancia_km, "consumoRegistradoL": recorrido.consumo_registrado_l}
+            nuevos = dict(anteriores)
+            errores = []
+            for campo, valor in (("distanciaKm", distancia), ("consumoRegistradoL", consumo)):
+                if valor is None:
+                    continue
+                if v.positivo(valor) == anteriores[campo]:
+                    errores.append({"campo": campo, "detalle": "Debe ser mayor que 0 y distinto del valor actual"})
+                nuevos[campo] = v.positivo(valor)
+            if errores:
+                raise DatosNoValidos("Los valores corregidos no son válidos", errores)
+
+            recorrido.distancia_km, recorrido.consumo_registrado_l = nuevos["distanciaKm"], nuevos["consumoRegistradoL"]
+            self.repositorio.actualizar(recorrido)
+            for campo in ("distanciaKm", "consumoRegistradoL"):
+                if nuevos[campo] != anteriores[campo]:
+                    self.historial.registrar("recorrido", codigo, campo, str(anteriores[campo]), str(nuevos[campo]),
+                                             responsable, motivo)
+            _, resultado = procesar_correccion_recorrido(self.db, codigo, recorrido.distancia_km,
+                                                         recorrido.consumo_registrado_l)
+            self.db.commit()
+
+        return {"codigoRecorrido": codigo, "valoresAnteriores": anteriores, "valoresNuevos": nuevos,
+                "consumoEstimadoL": resultado.consumo_estimado_l, "desviacionPct": resultado.desviacion_pct,
+                "emisionesKgCO2": resultado.emisiones_kgco2}
