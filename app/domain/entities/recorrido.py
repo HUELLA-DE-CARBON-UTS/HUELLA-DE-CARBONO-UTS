@@ -18,6 +18,9 @@ class Recorrido:
     consumo_registrado_l: float | None = None
     motivo_cancelacion: str = ""
 
+    def fecha_referencia(self) -> date:
+        return self.fecha_cierre if self.estado == "cerrado" and self.fecha_cierre else self.fecha_programada
+
 
 @dataclass
 class ResultadoRecorrido:
