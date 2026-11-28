@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import SesionUsuario
@@ -8,7 +8,7 @@ from app.api.dependencies.roles import requiere_permiso
 from app.api.schemas.recorrido import (
     CancelacionEntrada, CierreEntrada, CorreccionCierreEntrada, RecorridoEntrada, ReprogramacionEntrada)
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
-from app.services.use_cases.consultas_recorridos import ConsultarRecorrido
+from app.services.use_cases.consultas_recorridos import ConsultarHistorialRecorridos, ConsultarRecorrido
 from app.services.use_cases.gestion_recorridos import (
     CancelarRecorrido, CerrarRecorrido, CorregirCierre, ProgramarRecorrido, ReprogramarRecorrido)
 
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/v1/recorridos", tags=["MOD-05 Gestión de Recorr
 SIN_SESION = {401: {"description": "No hay una sesión vigente"}}
 CODIGO = Path(..., description="Código del recorrido, por ejemplo REC-0152")
 FORMATO_CODIGO = [{"campo": "codigoRecorrido", "detalle": "Debe tener el formato REC-0000"}]
+RANGO = [{"campo": "fechaInicial", "detalle": "La fecha inicial no puede ser posterior a la fecha final"}]
 
 
 def _sin_permiso(funcionalidad: str, mensaje: str) -> dict:
@@ -57,6 +58,40 @@ def programar_recorrido(
     datos = ProgramarRecorrido(db, distancias).ejecutar(entrada.placa, entrada.origen, entrada.destino,
                                                         entrada.fechaProgramada, sesion.documento)
     return responder(201, "Recorrido programado correctamente", datos, funcionalidad="FUN-36")
+
+
+@router.get(
+    "",
+    summary="HU-42 Consultar el historial de recorridos de un rango de fechas",
+    description="Retorna los recorridos del rango, del más reciente al más antiguo, con código, placa, fecha, origen, "
+                "destino, distancia, litros y estado. La fecha es la de cierre en los cerrados y la programada en los "
+                "demás. Los filtros de sede (IC-16) y estado son opcionales. Requiere el permiso FUN-42 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-42", ConsultarHistorialRecorridos.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta del historial exitosa", [
+            {"codigoRecorrido": "REC-0152", "placa": "TTK-482", "fecha": "2026-11-19", "origen": "Bucaramanga",
+             "destino": "Barranquilla", "distanciaKm": 400, "litros": 55.0, "estado": "cerrado"},
+            {"codigoRecorrido": "REC-0149", "placa": "SXR-215", "fecha": "2026-11-17", "origen": "Bucaramanga",
+             "destino": "Cúcuta", "distanciaKm": None, "litros": None, "estado": "cancelado"}], None, "FUN-42"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-42", "No tiene permiso para consultar el historial de recorridos"),
+        404: ejemplo(404, "Sin resultados", None,
+                     [{"campo": "fechaInicial", "detalle": "No hay recorridos en el rango indicado"}], "FUN-42"),
+        422: ejemplo(422, "El rango de fechas no es válido", None, RANGO, "FUN-42"),
+        503: {"description": ConsultarHistorialRecorridos.MENSAJE_503},
+    },
+)
+def consultar_historial_recorridos(
+    fechaInicial: str | None = Query(None, description="Fecha inicial (AAAA-MM-DD)"),
+    fechaFinal: str | None = Query(None, description="Fecha final (AAAA-MM-DD)"),
+    sede: str | None = Query(None, description="Nombre o identificador (SED-XX) de la sede del vehículo"),
+    estado: str | None = Query(None, description='"programado", "cerrado" o "cancelado"'),
+    _sesion: SesionUsuario = Depends(requiere_permiso(
+        "FUN-42", "No tiene permiso para consultar el historial de recorridos")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarHistorialRecorridos(db).ejecutar(fechaInicial, fechaFinal, sede, estado)
+    return responder(200, "Consulta del historial exitosa", datos, funcionalidad="FUN-42")
 
 
 @router.patch(
