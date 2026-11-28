@@ -33,3 +33,12 @@ class CierreEntrada(BaseModel):
 
     model_config = {"json_schema_extra": {"examples": [{
         "fechaCierre": "2026-12-18", "distanciaKm": 400, "consumoRegistradoL": 55}]}}
+
+
+class CorreccionCierreEntrada(BaseModel):
+    distanciaKm: Any = Field(None, description="Distancia corregida en km, mayor que 0 y distinta de la actual")
+    consumoRegistradoL: Any = Field(None, description="Litros corregidos, mayores que 0 y distintos de los actuales")
+    motivo: str | None = Field(None, description="Motivo de la corrección")
+
+    model_config = {"json_schema_extra": {"examples": [{
+        "consumoRegistradoL": 52, "motivo": "El tiquete de combustible tenía un error de digitación"}]}}
