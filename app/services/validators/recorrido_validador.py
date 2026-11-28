@@ -1,10 +1,23 @@
+import re
+
+from app.domain.exceptions.errores import SolicitudIncorrecta
 from app.services.validators.catalogo_validador import fecha, limpiar, numero
 from app.services.validators.vehiculo_validador import FORMATO_PLACA
+
+FORMATO_CODIGO = re.compile(r"^REC-\d{4,}$")
 FORMATO_FECHA_NO_VALIDO = "Formato de fecha no válido. Debe ser YYYY-MM-DD"
 
 
 def normalizar_codigo(valor) -> str:
     return limpiar(valor).upper()
+
+
+def validar_codigo(valor) -> str:
+    codigo = normalizar_codigo(valor)
+    if not FORMATO_CODIGO.match(codigo):
+        raise SolicitudIncorrecta("El código del recorrido no es válido", [
+            {"campo": "codigoRecorrido", "detalle": "Debe tener el formato REC-0000"}])
+    return codigo
 
 
 def positivo(valor) -> float | None:
