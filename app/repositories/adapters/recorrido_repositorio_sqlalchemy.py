@@ -58,3 +58,8 @@ class RecorridoRepositorioSQLAlchemy:
         datos = {campo: getattr(resultado, campo) for campo in CAMPOS_RESULTADO}
         self.sesion.add(ResultadoRecorridoModelo(**datos, vigente=True, fecha_calculo=ahora()))
         self.sesion.flush()
+
+    def resultado_vigente(self, codigo: str) -> ResultadoRecorrido | None:
+        modelo = self.sesion.scalar(select(ResultadoRecorridoModelo).where(
+            ResultadoRecorridoModelo.codigo == codigo, ResultadoRecorridoModelo.vigente.is_(True)))
+        return _resultado(modelo) if modelo else None
