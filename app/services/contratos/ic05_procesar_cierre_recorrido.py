@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.services.contratos.ic02_consultar_catalogo_vigente import nombre_en_catalogo
 from app.services.contratos.ic06_obtener_factor_consumo_vigente import obtener_factor_consumo_vigente
+from app.services.contratos.ic07_obtener_factor_emision_vigente import obtener_factor_emision_vigente
 from app.services.contratos.resultado import cuerpo_estandar
 from app.services.validators import recorrido_validador as v
 from app.services.validators.catalogo_validador import fecha
@@ -63,6 +64,25 @@ def eficiencia(codigo: str, consumo_registrado, distancia, consumo_estimado_l) -
         "interpretacion": interpretar(desviacion)}, []
 
 
+def emisiones(db: Session, codigo: str, consumo_registrado, id_combustible: str, fecha_cierre) -> tuple:
+    dia, error = _fecha_cierre(fecha_cierre)
+    if error:
+        return 422, "Los datos del recorrido no son válidos", None, [error]
+    if v.error_positivo("consumoRegistradoL", consumo_registrado):
+        return 422, "El consumo registrado no es válido", None, [
+            v.error_positivo("consumoRegistradoL", consumo_registrado)]
+    factor = obtener_factor_emision_vigente(db, id_combustible, dia)
+    if factor is None:
+        nombre = nombre_en_catalogo(db, "combustible", id_combustible)
+        return 422, "Cálculo pendiente: no existe factor de emisión vigente", None, [
+            {"campo": "combustible", "detalle": f"El combustible {nombre} no tiene factor vigente al {dia.isoformat()}"}]
+    registrado = v.positivo(consumo_registrado)
+    return 200, "Emisiones calculadas", {
+        "codigoRecorrido": codigo, "consumoRegistradoL": registrado,
+        "factorEmisionKgCO2L": factor["factorEmisionKgCO2L"], "fuente": factor["fuente"],
+        "emisionesKgCO2": round(registrado * factor["factorEmisionKgCO2L"], 2), "idFactor": factor["idFactor"]}, []
+
+
 def _contrato(funcionalidad: str, mensaje_503: str, calculo, *argumentos) -> dict:
     try:
         codigo_http, mensaje, datos, errores = calculo(*argumentos)
@@ -81,3 +101,8 @@ def calcular_consumo_estimado(db: Session, codigo: str, distancia, id_tipo: str,
 def evaluar_eficiencia(codigo: str, consumo_registrado, distancia, consumo_estimado_l) -> dict:
     return _contrato("FUN-47", "No fue posible evaluar la eficiencia del recorrido", eficiencia,
                      codigo, consumo_registrado, distancia, consumo_estimado_l)
+
+
+def calcular_emisiones(db: Session, codigo: str, consumo_registrado, id_combustible: str, fecha_cierre) -> dict:
+    return _contrato("FUN-51", "No fue posible calcular las emisiones del recorrido", emisiones,
+                     db, codigo, consumo_registrado, id_combustible, fecha_cierre)
