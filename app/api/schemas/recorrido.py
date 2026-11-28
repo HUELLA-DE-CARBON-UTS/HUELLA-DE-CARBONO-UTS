@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -22,3 +24,12 @@ class CancelacionEntrada(BaseModel):
     motivo: str | None = Field(None, description="Motivo de la cancelación")
 
     model_config = {"json_schema_extra": {"examples": [{"motivo": "El cliente aplazó el despacho"}]}}
+
+
+class CierreEntrada(BaseModel):
+    fechaCierre: str | None = Field(None, description="Fecha de cierre (AAAA-MM-DD), no anterior a la programada")
+    distanciaKm: Any = Field(None, description="Distancia recorrida en km, mayor que 0")
+    consumoRegistradoL: Any = Field(None, description="Litros consumidos, mayor que 0")
+
+    model_config = {"json_schema_extra": {"examples": [{
+        "fechaCierre": "2026-12-18", "distanciaKm": 400, "consumoRegistradoL": 55}]}}

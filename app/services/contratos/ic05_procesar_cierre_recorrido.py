@@ -3,6 +3,8 @@ from datetime import date
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.domain.entities.recorrido import ResultadoRecorrido
+from app.repositories.adapters.recorrido_repositorio_sqlalchemy import RecorridoRepositorioSQLAlchemy
 from app.services.contratos.ic02_consultar_catalogo_vigente import nombre_en_catalogo
 from app.services.contratos.ic06_obtener_factor_consumo_vigente import obtener_factor_consumo_vigente
 from app.services.contratos.ic07_obtener_factor_emision_vigente import obtener_factor_emision_vigente
@@ -81,6 +83,49 @@ def emisiones(db: Session, codigo: str, consumo_registrado, id_combustible: str,
         "codigoRecorrido": codigo, "consumoRegistradoL": registrado,
         "factorEmisionKgCO2L": factor["factorEmisionKgCO2L"], "fuente": factor["fuente"],
         "emisionesKgCO2": round(registrado * factor["factorEmisionKgCO2L"], 2), "idFactor": factor["idFactor"]}, []
+
+
+def calcular_resultado(db: Session, codigo: str, distancia: float, consumo: float, id_tipo: str,
+                       id_combustible: str, fecha_cierre: date, version: int = 1) -> ResultadoRecorrido:
+    resultado = ResultadoRecorrido(codigo=codigo, distancia_km=distancia, consumo_registrado_l=consumo,
+                                   version=version)
+    codigo_http, _, datos, errores = consumo_estimado(db, codigo, distancia, id_tipo, fecha_cierre)
+    if codigo_http == 200:
+        resultado.estado_consumo = "completo"
+        resultado.id_factor_consumo = datos["idFactor"]
+        resultado.factor_consumo_lkm = datos["factorConsumoLkm"]
+        resultado.consumo_estimado_l = datos["consumoEstimadoL"]
+        _, _, datos_eficiencia, _ = eficiencia(codigo, consumo, distancia, resultado.consumo_estimado_l)
+        resultado.rendimiento_lkm = datos_eficiencia["rendimientoLkm"]
+        resultado.desviacion_pct = datos_eficiencia["desviacionPct"]
+    else:
+        nombre = nombre_en_catalogo(db, "tipo", id_tipo)
+        resultado.causa_consumo = f"El tipo {nombre} no tiene factor de consumo vigente"
+
+    codigo_http, _, datos, _ = emisiones(db, codigo, consumo, id_combustible, fecha_cierre)
+    if codigo_http == 200:
+        resultado.estado_emisiones = "completo"
+        resultado.id_factor_emision = datos["idFactor"]
+        resultado.factor_emision_kgco2l = datos["factorEmisionKgCO2L"]
+        resultado.fuente_emision = datos["fuente"]
+        resultado.emisiones_kgco2 = datos["emisionesKgCO2"]
+    else:
+        nombre = nombre_en_catalogo(db, "combustible", id_combustible)
+        resultado.causa_emisiones = f"El combustible {nombre} no tiene factor de emisión vigente"
+    return resultado
+
+
+def resumen(resultado: ResultadoRecorrido) -> dict:
+    return {"consumoEstimadoL": resultado.consumo_estimado_l, "rendimientoLkm": resultado.rendimiento_lkm,
+            "desviacionPct": resultado.desviacion_pct, "emisionesKgCO2": resultado.emisiones_kgco2,
+            "estadoCalculo": "completo" if resultado.completo() else "pendiente"}
+
+
+def procesar_cierre_recorrido(db: Session, codigo: str, distancia: float, consumo: float, id_tipo: str,
+                              id_combustible: str, fecha_cierre: date) -> ResultadoRecorrido:
+    resultado = calcular_resultado(db, codigo, distancia, consumo, id_tipo, id_combustible, fecha_cierre)
+    RecorridoRepositorioSQLAlchemy(db).guardar_resultado(resultado)
+    return resultado
 
 
 def _contrato(funcionalidad: str, mensaje_503: str, calculo, *argumentos) -> dict:

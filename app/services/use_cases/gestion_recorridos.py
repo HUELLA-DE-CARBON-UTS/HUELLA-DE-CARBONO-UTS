@@ -7,6 +7,7 @@ from app.repositories.adapters.recorrido_repositorio_sqlalchemy import Recorrido
 from app.services.contratos.ic03_consultar_disponibilidad_vehiculo import (
     consultar_disponibilidad_vehiculo, detalle_no_disponible)
 from app.services.contratos.ic04_cambiar_estado_operativo_vehiculo import cambiar_estado_operativo_vehiculo
+from app.services.contratos.ic05_procesar_cierre_recorrido import procesar_cierre_recorrido, resumen
 from app.services.use_cases.catalogo_comun import hoy
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import recorrido_validador as v
@@ -162,3 +163,47 @@ class CancelarRecorrido:
 
         return {"codigoRecorrido": codigo, "estado": recorrido.estado, "motivo": motivo,
                 "placaLiberada": recorrido.placa}
+
+
+class CerrarRecorrido:
+
+    MENSAJE_503 = "No fue posible registrar el cierre del recorrido"
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.repositorio = RecorridoRepositorioSQLAlchemy(db)
+        self.historial = HistorialRepositorioSQLAlchemy(db)
+
+    def ejecutar(self, codigo, fecha_cierre, distancia, consumo, responsable: str) -> dict:
+        codigo = v.normalizar_codigo(codigo)
+        errores = [e for e in [v.error_fecha("fechaCierre", fecha_cierre),
+                               v.error_positivo("distanciaKm", distancia),
+                               v.error_positivo("consumoRegistradoL", consumo)] if e]
+        if errores:
+            raise DatosNoValidos("Los datos del cierre no son válidos", errores)
+
+        with transaccion(self.db, self.MENSAJE_503):
+            recorrido = self.repositorio.buscar(codigo)
+            if recorrido is None:
+                raise _no_encontrado(codigo)
+            if recorrido.estado != "programado":
+                raise Conflicto("El recorrido no se puede cerrar en su estado actual", [
+                    {"campo": "codigoRecorrido",
+                     "detalle": f'El recorrido {codigo} está en estado "{recorrido.estado}"'}])
+            dia = fecha(fecha_cierre)
+            if dia < recorrido.fecha_programada:
+                raise DatosNoValidos("Los datos del cierre no son válidos", [
+                    {"campo": "fechaCierre", "detalle": "La fecha de cierre no puede ser anterior a la fecha "
+                                                       f"programada ({recorrido.fecha_programada.isoformat()})"}])
+            recorrido.estado, recorrido.fecha_cierre = "cerrado", dia
+            recorrido.distancia_km, recorrido.consumo_registrado_l = v.positivo(distancia), v.positivo(consumo)
+            self.repositorio.actualizar(recorrido)
+            resultado = procesar_cierre_recorrido(self.db, codigo, recorrido.distancia_km,
+                                                  recorrido.consumo_registrado_l, recorrido.id_tipo,
+                                                  recorrido.id_combustible, dia)
+            cambiar_estado_operativo_vehiculo(self.db, recorrido.placa, "disponible")
+            self.historial.registrar("recorrido", codigo, "estado", "programado", "cerrado", responsable)
+            self.db.commit()
+
+        return {"codigoRecorrido": codigo, "placa": recorrido.placa, "distanciaKm": recorrido.distancia_km,
+                "consumoRegistradoL": recorrido.consumo_registrado_l, **resumen(resultado)}

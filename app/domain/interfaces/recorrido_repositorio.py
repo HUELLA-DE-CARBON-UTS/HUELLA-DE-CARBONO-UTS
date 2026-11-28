@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from app.domain.entities.recorrido import Recorrido
+from app.domain.entities.recorrido import Recorrido, ResultadoRecorrido
 
 
 class RecorridoRepositorio(Protocol):
@@ -13,3 +13,5 @@ class RecorridoRepositorio(Protocol):
     def actualizar(self, recorrido: Recorrido) -> None: ...
 
     def abierto_de(self, placa: str) -> str | None: ...
+
+    def guardar_resultado(self, resultado: ResultadoRecorrido) -> None: ...
