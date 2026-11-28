@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 
-from app.domain.exceptions.errores import DatosNoValidos, NoEncontrado
+from app.domain.exceptions.errores import Conflicto, DatosNoValidos, NoEncontrado
 from app.repositories.adapters.recorrido_repositorio_sqlalchemy import RecorridoRepositorioSQLAlchemy
+from app.services.contratos.ic02_consultar_catalogo_vigente import nombre_en_catalogo
 from app.services.contratos.ic03_consultar_disponibilidad_vehiculo import consultar_disponibilidad_vehiculo
 from app.services.contratos.ic08_consultar_resultado_recorrido import consultar_resultado_recorrido
 from app.services.contratos.ic16_consultar_vehiculos_por_criterio import placas_de_sede
@@ -21,6 +22,14 @@ def _validar_placa(placa) -> str:
     if error:
         raise DatosNoValidos("Los parámetros de consulta no son válidos", [error])
     return placa
+
+
+def _recorrido_cerrado(db: Session, codigo: str):
+    recorrido = RecorridoRepositorioSQLAlchemy(db).buscar(codigo)
+    if recorrido is None or recorrido.estado != "cerrado":
+        raise NoEncontrado("Recorrido no encontrado", [
+            {"campo": "codigoRecorrido", "detalle": f"No existe un recorrido cerrado con el código {codigo}"}])
+    return recorrido, consultar_resultado_recorrido(db, codigo)
 
 
 class ConsultarRecorrido:
@@ -155,3 +164,24 @@ class ConsultarCalculosPendientes:
                 {"campo": "fechaInicial",
                  "detalle": "Todos los recorridos cerrados del rango tienen sus cálculos completos"}])
         return sorted(filas, key=lambda f: (f["fechaCierre"], f["codigoRecorrido"]))
+
+
+class ConsultarConsumoRecorrido:
+
+    MENSAJE_503 = "No fue posible consultar el resultado de consumo"
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def ejecutar(self, codigo) -> dict:
+        codigo = v.validar_codigo(codigo)
+        with transaccion(self.db, self.MENSAJE_503):
+            recorrido, resultado = _recorrido_cerrado(self.db, codigo)
+            if resultado is None or resultado.estado_consumo != "completo":
+                nombre = nombre_en_catalogo(self.db, "tipo", recorrido.id_tipo)
+                raise Conflicto("El cálculo de consumo está pendiente", [
+                    {"campo": "codigoRecorrido",
+                     "detalle": f"El tipo {nombre} no tenía factor vigente en la fecha de cierre"}])
+        return {"codigoRecorrido": codigo, "consumoRegistradoL": resultado.consumo_registrado_l,
+                "consumoEstimadoL": resultado.consumo_estimado_l, "rendimientoLkm": resultado.rendimiento_lkm,
+                "desviacionPct": resultado.desviacion_pct, "factorConsumoLkm": resultado.factor_consumo_lkm}
