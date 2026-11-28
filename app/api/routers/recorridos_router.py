@@ -9,7 +9,7 @@ from app.api.schemas.recorrido import (
     CancelacionEntrada, CierreEntrada, CorreccionCierreEntrada, RecorridoEntrada, ReprogramacionEntrada)
 from app.api.schemas.respuesta import RespuestaEstandar, ejemplo, responder, ruta
 from app.services.use_cases.consultas_recorridos import (
-    ConsultarHistorialRecorridos, ConsultarPendientesCierre, ConsultarRecorrido)
+    ConsultarHistorialRecorridos, ConsultarPendientesCierre, ConsultarRecorrido, ConsultarRecorridosVehiculo)
 from app.services.use_cases.gestion_recorridos import (
     CancelarRecorrido, CerrarRecorrido, CorregirCierre, ProgramarRecorrido, ReprogramarRecorrido)
 
@@ -124,6 +124,38 @@ def consultar_pendientes_cierre(
 ):
     datos = ConsultarPendientesCierre(db).ejecutar(sede, placa)
     return responder(200, "Consulta de recorridos pendientes de cierre exitosa", datos, funcionalidad="FUN-43")
+
+
+@router.get(
+    "/vehiculo/{placa}",
+    summary="HU-44 Consultar los recorridos de un vehículo en un rango de fechas",
+    description="Verifica que el vehículo exista (IC-03) y retorna sus recorridos cerrados del rango, del más reciente "
+                "al más antiguo, con el total de recorridos y de distancia. Requiere el permiso FUN-44 (IC-01).",
+    response_model=RespuestaEstandar, openapi_extra=ruta("FUN-44", ConsultarRecorridosVehiculo.MENSAJE_503),
+    responses={
+        200: ejemplo(200, "Consulta de recorridos del vehículo exitosa", {
+            "placa": "TTK-482",
+            "recorridos": [{"codigoRecorrido": "REC-0152", "fecha": "2026-11-19", "distanciaKm": 400, "litros": 55.0},
+                           {"codigoRecorrido": "REC-0133", "fecha": "2026-11-06", "distanciaKm": 198, "litros": 26.0}],
+            "totalRecorridos": 2, "distanciaTotalKm": 598}, None, "FUN-44"),
+        **SIN_SESION,
+        403: _sin_permiso("FUN-44", "No tiene permiso para consultar los recorridos del vehículo"),
+        404: ejemplo(404, "Vehículo no encontrado", None,
+                     [{"campo": "placa", "detalle": "No existe un vehículo con la placa ABC-000"}], "FUN-44"),
+        422: ejemplo(422, "El rango de fechas no es válido", None, RANGO, "FUN-44"),
+        503: {"description": ConsultarRecorridosVehiculo.MENSAJE_503},
+    },
+)
+def consultar_recorridos_vehiculo(
+    placa: str = Path(..., description="Placa del vehículo, por ejemplo TTK-482"),
+    fechaInicial: str | None = Query(None, description="Fecha inicial (AAAA-MM-DD)"),
+    fechaFinal: str | None = Query(None, description="Fecha final (AAAA-MM-DD)"),
+    _sesion: SesionUsuario = Depends(requiere_permiso(
+        "FUN-44", "No tiene permiso para consultar los recorridos del vehículo")),
+    db: Session = Depends(get_db),
+):
+    datos = ConsultarRecorridosVehiculo(db).ejecutar(placa, fechaInicial, fechaFinal)
+    return responder(200, "Consulta de recorridos del vehículo exitosa", datos, funcionalidad="FUN-44")
 
 
 @router.patch(
