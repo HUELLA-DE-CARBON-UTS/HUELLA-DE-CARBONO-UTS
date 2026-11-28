@@ -4,11 +4,21 @@ from app.domain.exceptions.errores import DatosNoValidos, NoEncontrado
 from app.repositories.adapters.recorrido_repositorio_sqlalchemy import RecorridoRepositorioSQLAlchemy
 from app.services.contratos.ic08_consultar_resultado_recorrido import consultar_resultado_recorrido
 from app.services.contratos.ic16_consultar_vehiculos_por_criterio import placas_de_sede
+from app.services.use_cases.catalogo_comun import hoy
 from app.services.use_cases.transaccion import transaccion
 from app.services.validators import recorrido_validador as v
 from app.services.validators.catalogo_validador import limpiar
+from app.services.validators.vehiculo_validador import normalizar_placa
 
 NO_APLICA = "no aplica"
+
+
+def _validar_placa(placa) -> str:
+    placa = normalizar_placa(placa)
+    error = v.error_placa(placa)
+    if error:
+        raise DatosNoValidos("Los parámetros de consulta no son válidos", [error])
+    return placa
 
 
 class ConsultarRecorrido:
@@ -66,3 +76,31 @@ class ConsultarHistorialRecorridos:
         return [{"codigoRecorrido": r.codigo, "placa": r.placa, "fecha": r.fecha_referencia().isoformat(),
                  "origen": r.origen, "destino": r.destino, "distanciaKm": r.distancia_km,
                  "litros": r.consumo_registrado_l, "estado": r.estado} for r in recorridos]
+
+
+class ConsultarPendientesCierre:
+
+    MENSAJE_503 = "No fue posible consultar los recorridos pendientes de cierre"
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def ejecutar(self, sede=None, placa=None) -> list[dict]:
+        sede, placa = limpiar(sede), _validar_placa(placa)
+        with transaccion(self.db, self.MENSAJE_503):
+            dia = hoy()
+            placas = placas_de_sede(self.db, sede) if sede else None
+            vencidos = [r for r in RecorridoRepositorioSQLAlchemy(self.db).listar()
+                        if r.estado == "programado" and r.fecha_programada < dia
+                        and (not placa or r.placa == placa) and (placas is None or r.placa in placas)]
+        if not vencidos:
+            if sede:
+                error = {"campo": "sede", "detalle": f"No hay recorridos vencidos en la sede {sede}"}
+            elif placa:
+                error = {"campo": "placa", "detalle": f"No hay recorridos vencidos del vehículo {placa}"}
+            else:
+                error = {"campo": "criterios", "detalle": "No hay recorridos programados con fecha vencida"}
+            raise NoEncontrado("Sin recorridos pendientes de cierre", [error])
+        vencidos.sort(key=lambda r: (r.fecha_programada, r.codigo))
+        return [{"codigoRecorrido": r.codigo, "placa": r.placa, "fechaProgramada": r.fecha_programada.isoformat(),
+                 "diasAtraso": (dia - r.fecha_programada).days} for r in vencidos]
